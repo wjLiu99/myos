@@ -14,8 +14,8 @@ static void show_msg(const char *msg){
 	}
 	
 }
-//GDT表
-uint16_t gdt_table[][4]={
+//全局描述符表GDT
+uint16_t gdt[][4]={
 	{0,0,0,0},
 	{0xFFFF,0x0000,0x9a00,0x00cf},
 	{0xFFFF,0x0000,0x9200,0x00cf},
@@ -69,8 +69,15 @@ static void enter_protect_m(void){ //进入保护模式
 	uint8_t ret = inb(0x92);
 	outb(0x92,ret | 0x2);
 
-	//加载GDT表
-	lgdt((uint32_t)gdt_table , sizeof(gdt_table));
+	//加载全局描述符表GDT
+	lgdt((uint32_t)gdt , sizeof(gdt));
+
+	//置cr0的PE位为1
+	uint32_t cr0 = r_cr0();
+	w_cr0(cr0 | 1);
+
+	//远跳转
+	jmp_far_ptr(8,(uint32_t)entry_protect_mode);
 
 
 }

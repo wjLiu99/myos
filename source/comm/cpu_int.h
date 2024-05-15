@@ -16,25 +16,48 @@ static inline uint8_t inb(uint16_t port){
     return ret;
 
 }
+static inline uint16_t inw(uint16_t port){
+    uint16_t ret;
+    __asm__ __volatile__("in %[p],%[r]":[r]"=a"(ret):[p]"d"(port));
+    return ret;
 
+}
 //写端口
 static inline void outb(uint16_t port,uint8_t data){
 
     __asm__ __volatile__("outb %[d],%[p]"::[d]"a"(data),[p]"d"(port));
 }
 
-//加载gdt表
+//加载全局描述符表GDT
 static inline void lgdt(uint32_t start ,uint32_t size){
     struct{
         uint16_t limit;
-        uint32_t start0_15;
-        uint32_t start16_31;
+        uint16_t start0_15;
+        uint16_t start16_31;
     }gdt;
-    gdt.limit = size -1;
-    gdt.start0_15 = start >>16;
-    gdt.start16_31 = start & 0xFFFF;
+    gdt.limit = size - 1;
+    gdt.start0_15 = start & 0xFFFF;
+    gdt.start16_31 = start >> 16;
 
     __asm__ __volatile__("lgdt %[g]"::[g]"m"(gdt));
 }
 
+//读取cr0寄存器
+static inline uint32_t r_cr0(void){
+    uint32_t cr0;
+    __asm__ __volatile__("mov %%cr0 , %[v]":[v]"=r"(cr0));
+    return cr0;
+}
+//写入cr0寄存器
+static inline void w_cr0(uint32_t data){
+
+    __asm__ __volatile__("mov %[v] , %%cr0"::[v]"r"(data));
+}
+
+//远眺转
+static inline void jmp_far_ptr(uint32_t selector , uint32_t offset){
+    uint32_t addr[] = {offset , selector};
+    __asm__ __volatile__("ljmpl *(%[a]) "::[a]"r"(addr));
+    
+}
 #endif
