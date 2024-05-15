@@ -11,6 +11,7 @@
 #define LOADER_H
 #include"comm/boot_info.h"
 #include"comm/types.h"
+#include"comm/cpu_int.h"
 // 内存检测信息结构
 typedef struct SMAP_entry {
     uint32_t BaseL; // base address uint64_t

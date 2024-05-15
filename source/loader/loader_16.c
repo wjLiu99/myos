@@ -14,6 +14,12 @@ static void show_msg(const char *msg){
 	}
 	
 }
+//GDT表
+uint16_t gdt_table[][4]={
+	{0,0,0,0},
+	{0xFFFF,0x0000,0x9a00,0x00cf},
+	{0xFFFF,0x0000,0x9200,0x00cf},
+};
 
 static void  detect_memory(void) {
 	uint32_t contID = 0;
@@ -56,9 +62,22 @@ static void  detect_memory(void) {
     show_msg("ok.\r\n");
 }
 
+static void enter_protect_m(void){ //进入保护模式
+	//关中断
+	cli();
+	//打开A20地址线
+	uint8_t ret = inb(0x92);
+	outb(0x92,ret | 0x2);
+
+	//加载GDT表
+	lgdt((uint32_t)gdt_table , sizeof(gdt_table));
+
+
+}
 void loader_entry(void){
 	show_msg("......loading.....\n\r");
 	detect_memory();
+	enter_protect_m();
     for(;;) {}
 }
 
