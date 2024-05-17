@@ -4,7 +4,7 @@
 #include"comm/types.h"
 #include"comm/cpu_int.h"
 #define  SECTOR_SIZE   512
-#define  KERNEL_LOADADDR  (1024*1024)
+#define  ELFFILE_LOADADDR  (1024*1024)
 //声明汇编全局函数
 void entry_protect_mode(void);
 // 内存检测信息结构

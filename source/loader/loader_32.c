@@ -1,5 +1,5 @@
 #include "loader.h"
-
+#include"comm/elf.h"
 // LBA方式读取磁盘
 static void read_disk(uint32_t sector, uint32_t sector_cnt, uint8_t *buf)
 {
@@ -29,12 +29,47 @@ static void read_disk(uint32_t sector, uint32_t sector_cnt, uint8_t *buf)
         
     }
 }
+static uint32_t load_elf_file (uint8_t * file_buffer) {
+    
+    Elf32_Ehdr * elf_hdr = (Elf32_Ehdr *)file_buffer;
+    if ((elf_hdr->e_ident[0] != ELF_MAGIC) || (elf_hdr->e_ident[1] != 'E')
+        || (elf_hdr->e_ident[2] != 'L') || (elf_hdr->e_ident[3] != 'F')) {
+        return 0;
+    }
+
+    // 然后从中加载程序头，将内容拷贝到相应的位置
+    for (int i = 0; i < elf_hdr->e_phnum; i++) {
+        Elf32_Phdr * phdr = (Elf32_Phdr *)(file_buffer + elf_hdr->e_phoff) + i;
+        if (phdr->p_type != PT_LOAD) {
+            continue;
+        }
+
+		// 全部使用物理地址，此时分页机制还未打开
+        uint8_t * src = file_buffer + phdr->p_offset;
+        uint8_t * dest = (uint8_t *)phdr->p_paddr;
+        for (int j = 0; j < phdr->p_filesz; j++) {
+            *dest++ = *src++;
+        }
+
+		// memsz和filesz不同时，后续要填0
+		dest= (uint8_t *)phdr->p_paddr + phdr->p_filesz;
+		for (int j = 0; j < phdr->p_memsz - phdr->p_filesz; j++) {
+			*dest++ = 0;
+		}
+    }
+
+    return elf_hdr->e_entry;
+}
+
 void load_kernel()
 {
     //读磁盘，100扇区开始读500扇区，读入到1M字节处
-    read_disk(100,500,(uint8_t *)KERNEL_LOADADDR);
+    read_disk(100,500,(uint8_t *)ELFFILE_LOADADDR);
+    //解析elf文件将代码段和数据段加载进内存
+
+    uint32_t kernel_load_addr = load_elf_file((uint8_t *)ELFFILE_LOADADDR);
     //跳转到内存1M字节处运行
-    ((void (*)(boot_info_t *))KERNEL_LOADADDR)(&boot_info);
+    ((void (*)(boot_info_t *))kernel_load_addr)(&boot_info);
     for (;;)
     {
     }
