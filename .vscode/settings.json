@@ -33,7 +33,8 @@
         "httpd.h": "c",
         "netapi.h": "c",
         "sys_plat.h": "c",
-        "irq.h": "c"
+        "irq.h": "c",
+        "cpu.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

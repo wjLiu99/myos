@@ -44,7 +44,7 @@ enable_language(ASM)
 # 头文件搜索路径
 include_directories(
     ${PROJECT_SOURCE_DIR}/source
-    # ${PROJECT_SOURCE_DIR}/source/kernel/include
+    ${PROJECT_SOURCE_DIR}/source/kernel/include
     # ${PROJECT_SOURCE_DIR}/source/kernel/net/net/
     # ${PROJECT_SOURCE_DIR}/source/kernel/net/plat
     # ${PROJECT_SOURCE_DIR}/newlib/i686-elf/include
