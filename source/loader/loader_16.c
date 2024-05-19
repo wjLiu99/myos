@@ -14,7 +14,7 @@ static void show_msg(const char *msg){
 	}
 	
 }
-//全局描述符表GDT
+//全局描述符表GDT,临时使用，转到保护模式
 uint16_t gdt[][4]={
 	{0,0,0,0},
 	{0xFFFF,0x0000,0x9a00,0x00cf},

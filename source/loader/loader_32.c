@@ -60,7 +60,9 @@ static uint32_t load_elf_file (uint8_t * file_buffer) {
 
     return elf_hdr->e_entry;
 }
-
+void die(int errno){
+    while(1){};
+}
 void load_kernel()
 {
     //读磁盘，100扇区开始读500扇区，读入到1M字节处
@@ -68,6 +70,9 @@ void load_kernel()
     //解析elf文件将代码段和数据段加载进内存
 
     uint32_t kernel_load_addr = load_elf_file((uint8_t *)ELFFILE_LOADADDR);
+    if(kernel_load_addr == 0){
+        die(-1);
+    }
     //跳转到内存1M字节处运行
     ((void (*)(boot_info_t *))kernel_load_addr)(&boot_info);
     for (;;)

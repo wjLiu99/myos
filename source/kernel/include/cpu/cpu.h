@@ -34,14 +34,27 @@
 
 #pragma pack(1)
 //段描述符结构体
-typedef struct seg_desc_t{
+typedef struct _seg_desc_t{
     uint16_t limit15_0;
     uint16_t addr15_0;
     uint8_t addr16_23;
     uint16_t attr;//段属性
     uint8_t addr31_24;
 }seg_desc_t;
+
+
+//中断门描述符
+typedef struct _gate_desc_t{
+    uint16_t offset15_0;
+    uint16_t seg_selector;
+    uint16_t attr;
+    uint16_t offset31_16;
+}gate_desc_t;
+
+
+#pragma pack()
 void cpu_init (void);
 void seg_desc_set(int selector, uint32_t base, uint32_t limit, uint16_t attr);
-#pragma pack()
+void gate_desc_set(gate_desc_t *desc , uint16_t selector ,uint32_t offset,uint16_t attr);
+
 #endif
