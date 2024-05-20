@@ -1,6 +1,7 @@
 #include "cpu/cpu.h"
 #include "os_conf.h"
 #include"comm/cpu_int.h"
+
 static seg_desc_t gdt[GDT_SIZE];
 
 // 设置段描述符
@@ -46,4 +47,5 @@ void init_gdt(void)
 void cpu_init()
 {
     init_gdt();
+    
 }

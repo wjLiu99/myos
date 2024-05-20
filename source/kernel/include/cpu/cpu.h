@@ -42,6 +42,11 @@ typedef struct _seg_desc_t{
     uint8_t addr31_24;
 }seg_desc_t;
 
+#define GATE_TYPE_IDT		(0xE << 8)		// 中断32位门描述符
+#define GATE_TYPE_SYSCALL	(0xC << 8)		// 调用门
+#define GATE_P_PRESENT		(1 << 15)		// 是否存在
+#define GATE_DPL0			(0 << 13)		// 特权级0，最高特权级
+#define GATE_DPL3			(3 << 13)		// 特权级3，最低权限
 
 //中断门描述符
 typedef struct _gate_desc_t{

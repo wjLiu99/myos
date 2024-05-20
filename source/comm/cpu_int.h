@@ -42,6 +42,22 @@ static inline void lgdt(uint32_t start ,uint32_t size){
     __asm__ __volatile__("lgdt %[g]"::[g]"m"(gdt));
 }
 
+static inline void lidt(uint32_t start ,uint32_t size){
+    struct{
+        uint16_t limit;
+        uint16_t start0_15;
+        uint16_t start16_31;
+    }idt;
+    idt.limit = size - 1;
+    idt.start0_15 = start & 0xFFFF;
+    idt.start16_31 = start >> 16;
+
+    __asm__ __volatile__("lidt %[g]"::[g]"m"(idt));
+}
+//暂停
+static inline void hlt(void) {
+    __asm__ __volatile__("hlt");
+}
 //读取cr0寄存器
 static inline uint32_t r_cr0(void){
     uint32_t cr0;

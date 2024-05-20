@@ -7,4 +7,9 @@
 #define DS_SELECTOR		(2 * 8)		// 数据段描述符
 
 #define KERNEL_STACK_SIZE (8*1024)
+
+#define OS_TICKS_MS 10 //定时器每隔10ms产生一次中断
+
+#define OS_VERSION  "1.0.0"
+
 #endif

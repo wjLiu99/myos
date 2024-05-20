@@ -34,7 +34,10 @@
         "netapi.h": "c",
         "sys_plat.h": "c",
         "irq.h": "c",
-        "cpu.h": "c"
+        "cpu.h": "c",
+        "cpu_int.h": "c",
+        "os_conf.h": "c",
+        "kernellib.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }
