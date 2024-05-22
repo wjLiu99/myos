@@ -264,7 +264,7 @@ void kernel_vsprintf(char * buffer, const char * fmt, va_list args) {
 
 void panic (const char * file, int line, const char * func, const char * cond) {
     log_printf("assert failed! %s", cond);
-    log_printf("file: %s\nline %d\nfunc: %s\n", file, line, func);
+    log_printf("file: %s\r\nline %d\r\nfunc: %s\r\n", file, line, func);
 
     for (;;) {
         hlt();

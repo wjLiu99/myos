@@ -49,3 +49,20 @@ void cpu_init()
     init_gdt();
     
 }
+
+int gdt_alloc_desc (void){
+    for(int i =1;i<GDT_SIZE;i++){
+        seg_desc_t *desc = gdt +i;
+        if(desc->attr ==0){
+            return i * sizeof(seg_desc_t);
+        }
+    }
+    return -1;
+}
+void gdt_free_sel (int sel){
+
+}
+
+void switch_to_tss (uint32_t tss_selector){
+    jmp_far_ptr(tss_selector,0);
+}

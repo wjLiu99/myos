@@ -29,8 +29,7 @@
 #define SEG_RPL0                (0 << 0)
 #define SEG_RPL3                (3 << 0)
 
-#define EFLAGS_IF           (1 << 9)
-#define EFLAGS_DEFAULT      (1 << 1)
+
 
 #pragma pack(1)
 //段描述符结构体
@@ -56,10 +55,27 @@ typedef struct _gate_desc_t{
     uint16_t offset31_16;
 }gate_desc_t;
 
+//状态字寄存器
+#define EFLAGS_DEFAULT (1<<1)
+#define EFLAGS_IF  (1<<9)
+//TSS
+typedef struct _tss_t{
+    uint32_t pre_link;
+    uint32_t esp0, ss0, esp1, ss1, esp2, ss2;
+    uint32_t cr3;
+    uint32_t eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
+    uint32_t es, cs, ss, ds, fs, gs;
+    uint32_t ldt;
+    uint32_t iomap;
+}tss_t;
 
 #pragma pack()
 void cpu_init (void);
 void seg_desc_set(int selector, uint32_t base, uint32_t limit, uint16_t attr);
 void gate_desc_set(gate_desc_t *desc , uint16_t selector ,uint32_t offset,uint16_t attr);
 
+int gdt_alloc_desc (void);
+void gdt_free_sel (int sel);
+
+void switch_to_tss (uint32_t tss_selector);
 #endif

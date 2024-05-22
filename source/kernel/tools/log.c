@@ -31,6 +31,6 @@ void log_printf(const char *fmt, ...)
         outb(COM1_PORT, *p++);
     }
     //不同系统终端处理不同
-    outb(COM1_PORT,'\r'); //改变列号
-    outb(COM1_PORT,'\n'); //改变行号
+    outb(COM1_PORT,'\n'); //改变列号
+    outb(COM1_PORT,'\r'); //改变行号
 }

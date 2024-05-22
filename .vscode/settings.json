@@ -37,7 +37,15 @@
         "cpu.h": "c",
         "cpu_int.h": "c",
         "os_conf.h": "c",
-        "kernellib.h": "c"
+        "kernellib.h": "c",
+        "bit": "c",
+        "cstddef": "c",
+        "string": "c",
+        "optional": "c",
+        "limits": "c",
+        "memory": "c",
+        "new": "c",
+        "functional": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

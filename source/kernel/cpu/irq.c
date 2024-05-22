@@ -2,11 +2,32 @@
 #include "comm/cpu_int.h"
 #include "cpu/cpu.h"
 #include "os_conf.h"
+#include"tools/log.h"
 #define KERNEL_IDT_NUM 128
 gate_desc_t idt[KERNEL_IDT_NUM];
-
+static void dump_core_regs (exception_frame_t * frame) {
+  
+    log_printf("IRQ: %d, error code: %d.", frame->num, frame->error_code);
+    log_printf("CS: %d\nDS: %d\nES: %d\nSS: %d\nFS:%d\nGS:%d",
+               frame->cs, frame->ds, frame->es, frame->es, frame->fs, frame->gs
+    );
+     log_printf("EAX:0x%x\n"
+                "EBX:0x%x\n"
+                "ECX:0x%x\n"
+                "EDX:0x%x\n"
+                "EDI:0x%x\n"
+                "ESI:0x%x\n"
+                "EBP:0x%x\n",
+             
+               frame->eax, frame->ebx, frame->ecx, frame->edx,
+               frame->edi, frame->esi, frame->ebp);
+    log_printf("EIP:0x%x\nEFLAGS:0x%x\n", frame->eip, frame->eflags);
+}
 static void do_default_handler(exception_frame_t *frame, const char *msg)
 {
+    log_printf("--------------------------------");
+    log_printf("IRQ/Exception happend: %s.", msg);
+    dump_core_regs(frame);
     while (1)
     {
         hlt();
