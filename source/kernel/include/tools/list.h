@@ -26,7 +26,7 @@ static inline list_node_t *list_node_next(list_node_t *node){
 void list_init(list_t *list);
 
 static inline int list_is_empty(list_t *list){
-    return list->count;
+    return list->count==0;
 }
 static inline int list_count(list_t *list){
     return list->count;

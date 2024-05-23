@@ -2,7 +2,7 @@
 #include "cpu/irq.h"
 #include "comm/cpu_int.h"
 #include "os_conf.h"
-
+#include"core/task.h"
 
 static uint32_t sys_tick;						// 系统启动后的tick数量
 
@@ -18,7 +18,8 @@ uint32_t sys_get_ticks (void) {
  
 void do_handler_time(exception_frame_t *frame) {
     sys_tick++;
-    pic_send_eoi(IRQ0_TIMER);
+    pic_send_eoi(IRQ0_TIMER); //需要先运行才能继续响应中断，不然执行后续代码可能会切换进程就不会继续相应中断了
+    task_time_tick();
 }
 
 
@@ -42,3 +43,4 @@ void time_init (void) {
 
     init_pit();
 }
+

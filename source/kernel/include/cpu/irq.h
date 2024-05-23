@@ -109,4 +109,9 @@ void irq_disable(int irq_num);
 //调用该函数告诉8259芯片继续响应中断
 void pic_send_eoi(int irq_num);
 
+
+typedef uint32_t irq_state_t;//保存进入临界区之前的中断状态eflag
+irq_state_t irq_enter_protection(void);
+void irq_leave_protection(irq_state_t state);
+
 #endif

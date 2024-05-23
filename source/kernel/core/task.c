@@ -3,9 +3,10 @@
 #include "os_conf.h"
 #include "cpu/cpu.h"
 #include "tools/log.h"
-#include"comm/cpu_int.h"
+#include "comm/cpu_int.h"
+#include "cpu/irq.h"
 
-static task_mananger_t task_mananger;
+static task_manager_t task_manager;
 static int tss_init(task_t *task, uint32_t entry, uint32_t esp)
 {
     // 为TSS分配GDT
@@ -31,26 +32,34 @@ static int tss_init(task_t *task, uint32_t entry, uint32_t esp)
     return 0;
 }
 
-int task_init (task_t *task, const char * name, uint32_t entry, uint32_t esp)
+int task_init(task_t *task, const char *name, uint32_t entry, uint32_t esp)
 {
 
     ASSERT(task != (task_t *)0);
     tss_init(task, entry, esp);
     kernel_strncpy(task->name, name, TASK_NAME_SIZE);
     task->state = TASK_CREATED;
-    // uint32_t *pesp =  (uint32_t *)esp;
-    // if(pesp){
-    //     *(--pesp) = entry;
-    //     *(--pesp)=0;
-    //     *(--pesp)=0;
-    //     *(--pesp)=0;
-    //     *(--pesp)=0;
-    //     task->stack = pesp;
-    // }
+    task->time_ticks = TASK_TIME_SLICE_DEFAULT;
+    task->slice_ticks = task->time_ticks;
+    task->sleep_ticks = 0;
+    // 栈是先减再压数据
+    //  uint32_t *pesp =  (uint32_t *)esp;
+    //  if(pesp){
+    //      *(--pesp) = entry;
+    //      *(--pesp)=0;
+    //      *(--pesp)=0;
+    //      *(--pesp)=0;
+    //      *(--pesp)=0;
+    //      task->stack = pesp;
+    //  }
     list_node_init(&task->all_node);
     list_node_init(&task->run_node);
-    tast_set_ready(task);
-    list_insert_last(&task_mananger.task_list,&task->all_node);
+    list_node_init(&task->wait_node);
+
+    irq_state_t state = irq_enter_protection();
+    task_set_ready(task);
+    list_insert_last(&task_manager.task_list, &task->all_node);
+    irq_leave_protection(state);
     return 0;
 }
 void simple_switch(uint32_t **from, uint32_t *to);
@@ -61,54 +70,149 @@ void task_switch_from_to(task_t *from, task_t *to)
     // simple_switch(&from->stack, to->stack);
 }
 
-void task_mananger_init(void){
-    list_init(&task_mananger.task_list);
-    list_init(&task_mananger.ready_list);
-    task_mananger.curr_task=(task_t *)0;
-    
-
+static void idle_task_entry(void)
+{
+    while (1)
+    {
+        hlt();
+    }
+}
+static uint32_t idle_task_stack[1024];
+void task_manager_init(void)
+{
+    list_init(&task_manager.task_list);
+    list_init(&task_manager.ready_list);
+    list_init(&task_manager.sleep_list);
+    task_manager.curr_task = (task_t *)0;
+    task_init(&task_manager.idle_task,
+              "idle task",
+              (uint32_t)idle_task_entry,
+              (uint32_t)(&idle_task_stack[1024]));
 }
 
-void task_first_init(void){
-    task_init(&task_mananger.first_task, "first task",(uint32_t)0, (uint32_t)0); // 正在运行的进程不用设置入口地址
-    write_tr(task_mananger.first_task.tss_sel);
-    task_mananger.curr_task=&task_mananger.first_task;
+void task_first_init(void)
+{
+    task_init(&task_manager.first_task, "first task", (uint32_t)0, (uint32_t)0); // 正在运行的进程不用设置入口地址
+    write_tr(task_manager.first_task.tss_sel);
+    task_manager.curr_task = &task_manager.first_task;
 }
 
-task_t *task_first_task(void){
-    return &task_mananger.first_task;
+task_t *task_first_task(void)
+{
+    return &task_manager.first_task;
 }
-void tast_set_ready(task_t  *task){
-    list_insert_last(&task_mananger.ready_list,&task->run_node);
-    task->state = TASK_READY;
-}
-void task_set_block(task_t *task){
-    list_remove(&task_mananger.ready_list,&task->run_node);
-    
-}
-static task_t * task_next_run (void) {
 
+// 将任务从就绪队列移除
+void task_set_block(task_t *task)
+{
+    if (task == &task_manager.idle_task)
+    {
+        return;
+    }
+    list_remove(&task_manager.ready_list, &task->run_node);
+}
+
+task_t *task_current(void)
+{
+    return task_manager.curr_task;
+}
+
+static task_t *task_next_run(void)
+{
+
+    if (list_count(&task_manager.ready_list) == 0)
+    {
+        return &task_manager.idle_task;
+    }
     // 普通任务
-    list_node_t * task_node = list_first(&task_mananger.ready_list);
+    list_node_t *task_node = list_first(&task_manager.ready_list);
     return (task_t *)list_node_parent(task_node, task_t, run_node);
 }
-int sys_sched_yield(void){
-    if (list_count(&task_mananger.ready_list) > 1) {
-        task_t * curr_task = task_current();
 
-        
+void task_set_ready(task_t *task)
+{
+    if (task == &task_manager.idle_task)
+    {
+        return;
+    }
+    list_insert_last(&task_manager.ready_list, &task->run_node);
+    task->state = TASK_READY;
+}
+
+int sys_sched_yield(void)
+{
+    irq_state_t state = irq_enter_protection();
+    if (list_count(&task_manager.ready_list) > 1)
+    {
+        task_t *curr_task = task_current();
         task_set_block(curr_task);
         task_set_ready(curr_task);
-
         task_dispatch();
     }
+    irq_leave_protection(state);
+    return 0;
 }
-void task_dispatch (void) {
-    task_t * to = task_next_run();
-    if (to != task_mananger.curr_task) {
-        task_t * from = task_mananger.curr_task;
 
-        task_mananger.curr_task = to;
+void task_dispatch(void)
+{
+    irq_state_t state = irq_enter_protection();
+    task_t *to = task_next_run();
+    if (to != task_manager.curr_task)
+    {
+        task_t *from = task_current();
+
+        task_manager.curr_task = to;
+        to->state = TASK_RUNNING;
         task_switch_from_to(from, to);
     }
+    irq_leave_protection(state);
+}
+
+void task_time_tick(void)
+{
+    task_t *curr_task = task_current();
+    if (--curr_task->slice_ticks == 0)
+    {
+        curr_task->slice_ticks = curr_task->time_ticks;
+        task_set_block(curr_task);
+        task_set_ready(curr_task);
+        task_dispatch();
+    }
+    list_node_t *curr = list_first(&task_manager.sleep_list);
+    while (curr)
+    {
+        list_node_t *next = list_node_next(curr);
+        task_t *task = list_node_parent(curr, task_t, run_node);
+        if (--task->sleep_ticks == 0)
+        {
+            task_set_wakeup(task);
+            task_set_ready(task);
+        }
+        curr = next;
+    }
+    task_dispatch();
+}
+void sys_sleep(uint32_t ms)
+{
+    irq_state_t state = irq_enter_protection();
+
+    task_set_block(task_manager.curr_task);
+    task_set_sleep(task_manager.curr_task, (ms + OS_TICKS_MS - 1) / OS_TICKS_MS);
+    task_dispatch();
+
+    irq_leave_protection(state);
+}
+void task_set_sleep(task_t *task, uint32_t ticks)
+{
+    if (ticks == 0)
+    {
+        return;
+    }
+    task->sleep_ticks = ticks;
+    task->state = TASK_SLEEP;
+    list_insert_last(&task_manager.sleep_list, &task->run_node);
+}
+void task_set_wakeup(task_t *task)
+{
+    list_remove(&task_manager.sleep_list, &task->run_node);
 }

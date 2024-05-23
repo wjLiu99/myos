@@ -1,84 +1,106 @@
 #ifndef CPU_INT_H
 #define CPU_INT_H
-#include"types.h"
-//关中断
-static inline void cli(void){
+#include "types.h"
+// 关中断
+static inline void cli(void)
+{
     __asm__ __volatile__("cli");
 }
-//开中断
-static inline void sti(void){
+// 开中断
+static inline void sti(void)
+{
     __asm__ __volatile__("sti");
 }
-//读端口
-static inline uint8_t inb(uint16_t port){
+// 读端口
+static inline uint8_t inb(uint16_t port)
+{
     uint8_t ret;
-    __asm__ __volatile__("inb %[p],%[r]":[r]"=a"(ret):[p]"d"(port));
+    __asm__ __volatile__("inb %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
     return ret;
-
 }
-static inline uint16_t inw(uint16_t port){
+static inline uint16_t inw(uint16_t port)
+{
     uint16_t ret;
-    __asm__ __volatile__("in %[p],%[r]":[r]"=a"(ret):[p]"d"(port));
+    __asm__ __volatile__("in %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
     return ret;
-
 }
-//写端口
-static inline void outb(uint16_t port,uint8_t data){
+// 写端口
+static inline void outb(uint16_t port, uint8_t data)
+{
 
-    __asm__ __volatile__("outb %[d],%[p]"::[d]"a"(data),[p]"d"(port));
+    __asm__ __volatile__("outb %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
 }
 
-//加载全局描述符表GDT
-static inline void lgdt(uint32_t start ,uint32_t size){
-    struct{
+// 加载全局描述符表GDT
+static inline void lgdt(uint32_t start, uint32_t size)
+{
+    struct
+    {
         uint16_t limit;
         uint16_t start0_15;
         uint16_t start16_31;
-    }gdt;
+    } gdt;
     gdt.limit = size - 1;
     gdt.start0_15 = start & 0xFFFF;
     gdt.start16_31 = start >> 16;
 
-    __asm__ __volatile__("lgdt %[g]"::[g]"m"(gdt));
+    __asm__ __volatile__("lgdt %[g]" ::[g] "m"(gdt));
 }
 
-static inline void lidt(uint32_t start ,uint32_t size){
-    struct{
+static inline void lidt(uint32_t start, uint32_t size)
+{
+    struct
+    {
         uint16_t limit;
         uint16_t start0_15;
         uint16_t start16_31;
-    }idt;
+    } idt;
     idt.limit = size - 1;
     idt.start0_15 = start & 0xFFFF;
     idt.start16_31 = start >> 16;
 
-    __asm__ __volatile__("lidt %[g]"::[g]"m"(idt));
+    __asm__ __volatile__("lidt %[g]" ::[g] "m"(idt));
 }
-//暂停
-static inline void hlt(void) {
+// 暂停
+static inline void hlt(void)
+{
     __asm__ __volatile__("hlt");
 }
-//读取cr0寄存器
-static inline uint32_t r_cr0(void){
+// 读取cr0寄存器
+static inline uint32_t r_cr0(void)
+{
     uint32_t cr0;
-    __asm__ __volatile__("mov %%cr0 , %[v]":[v]"=r"(cr0));
+    __asm__ __volatile__("mov %%cr0 , %[v]" : [v] "=r"(cr0));
     return cr0;
 }
-//写入cr0寄存器
-static inline void w_cr0(uint32_t data){
+// 写入cr0寄存器
+static inline void w_cr0(uint32_t data)
+{
 
-    __asm__ __volatile__("mov %[v] , %%cr0"::[v]"r"(data));
+    __asm__ __volatile__("mov %[v] , %%cr0" ::[v] "r"(data));
 }
 
-//远眺转
-static inline void jmp_far_ptr(uint32_t selector , uint32_t offset){
-    uint32_t addr[] = {offset , selector};
-    __asm__ __volatile__("ljmpl *(%[a]) "::[a]"r"(addr));
-    
+// 远眺转
+static inline void jmp_far_ptr(uint32_t selector, uint32_t offset)
+{
+    uint32_t addr[] = {offset, selector};
+    __asm__ __volatile__("ljmpl *(%[a]) " ::[a] "r"(addr));
 }
 
+static inline void write_tr(uint16_t tss_sel)
+{
+    __asm__ __volatile__("ltr %%ax" ::"a"(tss_sel));
+}
 
-static inline void write_tr(uint16_t tss_sel){
-    __asm__ __volatile__("ltr %%ax"::"a"(tss_sel));
+static inline uint32_t read_eflags(void)
+{
+    uint32_t eflags;
+    __asm__ __volatile__("pushf\n\tpop %%eax" : "=a"(eflags));
+    return eflags;
+}
+static inline void write_eflags(uint32_t eflags)
+{
+
+    __asm__ __volatile__("push %%eax\n\tpopf" ::"a"(eflags));
 }
 #endif

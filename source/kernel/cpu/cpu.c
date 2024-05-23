@@ -1,17 +1,20 @@
 #include "cpu/cpu.h"
 #include "os_conf.h"
-#include"comm/cpu_int.h"
-
+#include "comm/cpu_int.h"
+#include "cpu/irq.h"
+#include "ipc/mutex.h"
 static seg_desc_t gdt[GDT_SIZE];
+static mutex_t mutex;
 
 // 设置段描述符
 void seg_desc_set(int selector, uint32_t base, uint32_t limit, uint16_t attr)
 {
     seg_desc_t *desc = gdt + (selector >> 3);
-    	if (limit > 0xfffff) {
-		attr |= 0x8000;
-		limit /= 0x1000;
-	}
+    if (limit > 0xfffff)
+    {
+        attr |= 0x8000;
+        limit /= 0x1000;
+    }
     desc->limit15_0 = limit & 0xffff;
     desc->addr15_0 = base & 0xffff;
     desc->addr16_23 = (base >> 16) & 0xff;
@@ -46,23 +49,30 @@ void init_gdt(void)
 
 void cpu_init()
 {
+    mutex_init(&mutex);
     init_gdt();
-    
 }
 
-int gdt_alloc_desc (void){
-    for(int i =1;i<GDT_SIZE;i++){
-        seg_desc_t *desc = gdt +i;
-        if(desc->attr ==0){
+int gdt_alloc_desc(void)
+{
+    mutex_lock(&mutex);
+    for (int i = 1; i < GDT_SIZE; i++)
+    {
+        seg_desc_t *desc = gdt + i;
+        if (desc->attr == 0)
+        {
+            mutex_unlock(&mutex);
             return i * sizeof(seg_desc_t);
         }
     }
+    mutex_unlock(&mutex);
     return -1;
 }
-void gdt_free_sel (int sel){
-
+void gdt_free_sel(int sel)
+{
 }
 
-void switch_to_tss (uint32_t tss_selector){
-    jmp_far_ptr(tss_selector,0);
+void switch_to_tss(uint32_t tss_selector)
+{
+    jmp_far_ptr(tss_selector, 0);
 }

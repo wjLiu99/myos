@@ -19,13 +19,12 @@
             "miDebuggerPath": "x86_64-elf-gdb",
             "miDebuggerServerAddress": "localhost:1234",
             "targetArchitecture": "x86",
-            "stopAtConnect": true,
+            "stopAtConnect": false,
             // 启动gdb之前，做些准备：写映像文件、启动qemu
-          
-            "linux": {
-                "preLaunchTask": "调试准备", // 仅在windows下可自动运行
-                "miDebuggerPath": "gdb", // linux下的特殊配置
-            },
+            "miDebuggerPath": "gdb",
+            "preLaunchTask": "调试准备",
+            
+    
             "customLaunchSetupCommands": [],
             "setupCommands": [
                 {
