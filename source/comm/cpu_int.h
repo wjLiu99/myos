@@ -80,7 +80,34 @@ static inline void w_cr0(uint32_t data)
     __asm__ __volatile__("mov %[v] , %%cr0" ::[v] "r"(data));
 }
 
-// 远眺转
+// 读取cr3寄存器
+static inline uint32_t r_cr3(void)
+{
+    uint32_t cr3;
+    __asm__ __volatile__("mov %%cr3 , %[v]" : [v] "=r"(cr3));
+    return cr3;
+}
+// 写入cr3寄存器
+static inline void w_cr3(uint32_t data)
+{
+
+    __asm__ __volatile__("mov %[v] , %%cr3" ::[v] "r"(data));
+}
+
+// 读取cr4寄存器
+static inline uint32_t r_cr4(void)
+{
+    uint32_t cr4;
+    __asm__ __volatile__("mov %%cr3 , %[v]" : [v] "=r"(cr4));
+    return cr4;
+}
+// 写入cr4寄存器
+static inline void w_cr4(uint32_t data)
+{
+
+    __asm__ __volatile__("mov %[v] , %%cr4" ::[v] "r"(data));
+}
+// 远跳转
 static inline void jmp_far_ptr(uint32_t selector, uint32_t offset)
 {
     uint32_t addr[] = {offset, selector};
