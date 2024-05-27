@@ -81,24 +81,26 @@ pte_t *find_pte(pde_t *page_dir, uint32_t vaddr, int alloc)
         {
             return (pte_t *)0;
         }
-        pde->v = pg_paddr | PTE_P;
+        pde->v = pg_paddr | PTE_P | PTE_W | PDE_U;
         page_table = (pte_t *)pg_paddr;
         kernel_memset(page_table, 0, MEM_PAGE_SIZE);
     }
     return page_table + pte_index(vaddr);
 }
+
+// 建立虚拟内存到物理内存的映射关系
 int memory_create_map(pde_t *page_dir, uint32_t vaddr, uint32_t paddr, int count, uint32_t perm)
 {
     for (int i = 0; i < count; i++)
     {
-        log_printf("create map: v-0x%x p-0x%x, perm: 0x%x", vaddr, paddr, perm);
+        // log_printf("create map: v-0x%x p-0x%x, perm: 0x%x", vaddr, paddr, perm);
         pte_t *pte = find_pte(page_dir, vaddr, 1);
         if (pte == (pte_t *)0)
         {
-            log_printf("create pte failed. pte == 0");
+            // log_printf("create pte failed. pte == 0");
             return -1;
         }
-        log_printf("\tpte addr: 0x%x", (uint32_t)pte);
+        // log_printf("\tpte addr: 0x%x", (uint32_t)pte);
         ASSERT(pte->present == 0);
         pte->v = paddr | perm | PTE_P;
         vaddr += MEM_PAGE_SIZE;
@@ -106,13 +108,17 @@ int memory_create_map(pde_t *page_dir, uint32_t vaddr, uint32_t paddr, int count
     }
 }
 
+// 建立内核页表
 void create_kernel_table(void)
 {
     extern uint8_t s_text[], e_text[], s_data[];
     static memory_map_t kernel_map[] = {
-        {0, s_text, 0, 0},
+
+        {0, s_text, 0, PTE_W},
         {s_text, e_text, s_text, 0},
-        {s_data, (void *)MEM_EBDA_START, s_data, 0}};
+        {s_data, (void *)MEM_EBDA_START, s_data, PTE_W},
+        {(void *)MEM_EXT_START, (void *)MEM_EXT_END, (void *)MEM_EXT_START, PTE_W}};
+
     for (int i = 0; i < sizeof(kernel_map) / sizeof(memory_map_t); i++)
     {
         memory_map_t *map = kernel_map + i;
@@ -139,6 +145,7 @@ void memory_init(boot_info_t *boot_info)
 
     log_printf("free memory : start 0x%x ,size :0x%x", MEM_EXT_START, mem_up1MB_free);
 
+    // 地址分配结构管理1m以上空间
     addr_alloc_init(&paddr_alloc, mem_free, MEM_EXT_START, mem_up1MB_free, MEM_PAGE_SIZE);
 
     mem_free += bitmap_byte_count(paddr_alloc.size / MEM_PAGE_SIZE);
@@ -147,4 +154,71 @@ void memory_init(boot_info_t *boot_info)
     create_kernel_table();
 
     mmu_set_page_dir((uint32_t)kernel_page_dir);
+}
+
+// 建立用户空间虚拟内存映射
+uint32_t memory_create_uvm(void)
+{
+    pde_t *page_dir = (pde_t *)addr_alloc_page(&paddr_alloc, 1);
+    if (page_dir == 0)
+    {
+        return 0;
+    }
+
+    kernel_memset((void *)page_dir, 0, MEM_PAGE_SIZE);
+
+    // 用户空间起始地址对应的页目录表项
+    uint32_t user_pde_start = pde_index(MEM_TASK_BASE);
+    for (int i = 0; i < user_pde_start; i++)
+    {
+        // 内核空间直接使用内核空间的页表，节省空间
+        page_dir[i].v = kernel_page_dir[i].v;
+    }
+
+    return (uint32_t)page_dir;
+}
+
+static int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t size, int perm)
+{
+    uint32_t curr_vaddr = vaddr;
+    int page_count = up2(size, MEM_PAGE_SIZE) / MEM_PAGE_SIZE;
+    for (int i = 0; i < page_count; i++)
+
+    {
+        uint32_t paddr = addr_alloc_page(&paddr_alloc, 1);
+        vaddr = down2(vaddr, MEM_PAGE_SIZE);
+        if (paddr == 0)
+        {
+            log_printf("mem alloc failed.no memory");
+            return 0;
+        }
+
+        int err = memory_create_map((pde_t *)page_dir, curr_vaddr, paddr, 1, perm);
+        if (err < 0)
+        {
+            log_printf("create memory faild.");
+            // 已经建立的映射关系未处理
+            addr_free_page(&paddr_alloc, vaddr, i + 1);
+            return 0;
+        }
+
+        curr_vaddr += MEM_PAGE_SIZE;
+    }
+    return 0;
+}
+
+// 给用户空间分配内存,使用tss段里保存的进程自己的页目录表
+int memory_alloc_page_for(uint32_t addr, uint32_t size, int perm)
+{
+    return memory_alloc_for_page_dir(task_current()->tss.cr3, addr, size, perm);
+}
+
+uint32_t memory_alloc_page(void)
+{
+    // 内核空间虚拟地址与物理地址相同
+    return addr_alloc_page(&paddr_alloc, 1);
+}
+
+void memory_free_page(uint32_t addr)
+{
 }

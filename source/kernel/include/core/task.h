@@ -44,6 +44,8 @@ typedef struct _task_manager_t
     list_t sleep_list;
     task_t first_task;
     task_t idle_task;
+    int app_code_sel; // 给所以用户程序使用的段选择子
+    int app_data_sel;
 } task_manager_t;
 void task_manager_init(void);
 void task_first_init(void);

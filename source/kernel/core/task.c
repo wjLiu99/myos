@@ -5,6 +5,8 @@
 #include "tools/log.h"
 #include "comm/cpu_int.h"
 #include "cpu/irq.h"
+#include "core/memory.h"
+#include "cpu/mmu.h"
 
 static task_manager_t task_manager;
 static int tss_init(task_t *task, uint32_t entry, uint32_t esp)
@@ -20,15 +22,26 @@ static int tss_init(task_t *task, uint32_t entry, uint32_t esp)
                  SEG_P_PRESENT | SEG_DPL0 | SEG_TYPE_TSS);
     task->tss_sel = tss_sel;
     kernel_memset(&task->tss, 0, sizeof(tss_t));
+
+    int code_sel, data_sel;
+    code_sel = task_manager.app_code_sel | SEG_RPL3;
+    data_sel = task_manager.app_data_sel | SEG_RPL3;
     task->tss.eip = entry;
     task->tss.esp = esp; // 未指定栈则用内核栈，即运行在特权级0的进程
     task->tss.esp0 = esp;
-    task->tss.ss0 = DS_SELECTOR;
+    task->tss.ss0 = DS_SELECTOR; //特权0使用的栈
     task->tss.eip = entry;
     task->tss.eflags = EFLAGS_DEFAULT | EFLAGS_IF;
-    task->tss.es = task->tss.ss = task->tss.ds = task->tss.fs = task->tss.gs = DS_SELECTOR; // 全部采用同一数据段
-    task->tss.cs = CS_SELECTOR;
+    task->tss.es = task->tss.ss = task->tss.ds = task->tss.fs = task->tss.gs = data_sel; // 全部采用同一数据段
+    task->tss.cs = code_sel;
     task->tss.iomap = 0;
+    uint32_t page_dir = memory_create_uvm();
+    if (page_dir == 0)
+    {
+        gdt_free_sel(tss_sel);
+        return -1;
+    }
+    task->tss.cr3 = page_dir;
     return 0;
 }
 
@@ -80,6 +93,12 @@ static void idle_task_entry(void)
 static uint32_t idle_task_stack[1024];
 void task_manager_init(void)
 {
+    int sel = gdt_alloc_desc();
+    seg_desc_set(sel, 0x00000000, 0xffffffff, SEG_P_PRESENT | SEG_DPL3 | SEG_S_NORMAL | SEG_TYPE_DATA | SEG_TYPE_RW | SEG_D);
+    task_manager.app_data_sel = sel;
+    sel = gdt_alloc_desc();
+    seg_desc_set(sel, 0x00000000, 0xffffffff, SEG_P_PRESENT | SEG_DPL3 | SEG_S_NORMAL | SEG_TYPE_CODE | SEG_TYPE_RW | SEG_D);
+    task_manager.app_code_sel = sel;
     list_init(&task_manager.task_list);
     list_init(&task_manager.ready_list);
     list_init(&task_manager.sleep_list);
@@ -92,9 +111,25 @@ void task_manager_init(void)
 
 void task_first_init(void)
 {
-    task_init(&task_manager.first_task, "first task", (uint32_t)0, (uint32_t)0); // 正在运行的进程不用设置入口地址
+    void first_task_entry(void);
+    extern uint8_t s_first_task[], e_first_task[];
+
+    uint32_t copy_size = (uint32_t)(e_first_task - s_first_task);
+    uint32_t alloc_size = 10 * MEM_PAGE_SIZE;
+    ASSERT(copy_size <= alloc_size);
+
+    uint32_t first_start = (uint32_t)first_task_entry;
+    task_init(&task_manager.first_task, "first task", first_start, (uint32_t)0); // 正在运行的进程不用设置入口地址
     write_tr(task_manager.first_task.tss_sel);
     task_manager.curr_task = &task_manager.first_task;
+
+    // 现在cr3已经是进程自己的页表了，tss_init的时候给进程分配了新的页表
+    mmu_set_page_dir(task_manager.first_task.tss.cr3);
+
+    // s_first_task是物理地址，但是页表中mem_ext_end以下的虚拟地址和物理地址完成了一一映射
+    // fisrt_start是虚拟地址，在分配完新的页表项后以及完成映射，可以直接写
+    memory_alloc_page_for(first_start, alloc_size, PTE_P | PTE_W);
+    kernel_memcpy((void *)first_start, s_first_task, copy_size);
 }
 
 task_t *task_first_task(void)

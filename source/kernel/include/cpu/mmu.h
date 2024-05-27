@@ -51,6 +51,7 @@ typedef union _pte_t
 
 #pragma pack()
 
+// 写cr3寄存器
 static inline void mmu_set_page_dir(uint32_t paddr)
 {
     w_cr3(paddr);

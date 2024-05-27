@@ -5,6 +5,7 @@ int bitmap_byte_count(int bit_count)
 {
     return (bit_count + 7) / 8;
 }
+
 void bitmap_init(bitmap_t *bitmap, uint8_t *bits, int count, int init_bit)
 {
     bitmap->bit_count = count;
@@ -12,10 +13,12 @@ void bitmap_init(bitmap_t *bitmap, uint8_t *bits, int count, int init_bit)
     int bytes = bitmap_byte_count(bitmap->bit_count);
     kernel_memset(bitmap->bits, init_bit ? 0xff : 0, bytes);
 }
+
 int bitmap_get_bit(bitmap_t *bitmap, int index)
 {
     return bitmap->bits[index / 8] & (1 << (index % 8));
 }
+
 void bitmap_set_bit(bitmap_t *bitmap, int index, int count, int bit)
 {
     for (int i = 0; (i < count) && (index < bitmap->bit_count); i++, index++)
@@ -30,10 +33,12 @@ void bitmap_set_bit(bitmap_t *bitmap, int index, int count, int bit)
         }
     }
 }
+
 int bitmap_is_set(bitmap_t *bitmap, int index)
 {
     return bitmap_get_bit(bitmap, index) ? 1 : 0;
 }
+
 int bitmap_alloc_nbits(bitmap_t *bitmap, int bit, int count)
 {
     int search_index = 0;

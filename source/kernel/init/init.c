@@ -16,8 +16,9 @@ void kernel_init(boot_info_t *boot_info)
 {
 
     cpu_init();
-    memory_init(boot_info);
     log_init();
+    memory_init(boot_info);
+
     irq_init();
     time_init();
     task_manager_init();
@@ -36,6 +37,14 @@ void init_task_entry(void)
 }
 static uint32_t init_task_stack[1024];
 
+void move_to_first_task(void)
+{
+    task_t *curr = task_current();
+    tss_t *tss = &(curr->tss);
+    __asm__ __volatile__(
+        "jmp *%[ip]" ::[ip] "r"(tss->eip));
+}
+
 void init_main(void)
 {
 
@@ -44,19 +53,20 @@ void init_main(void)
     log_printf("%d %d %x %c", 123, -123, 100, 'a');
     int cnt = 0;
 
-    // int a = 3/0;
-    task_init(&init_task, "init task", (uint32_t)init_task_entry, (uint32_t)&init_task_stack[1023]);
-    // task_set_ready(&init_task);
+    // task_init(&init_task, "init task", (uint32_t)init_task_entry, (uint32_t)&init_task_stack[1023]);
+
     task_first_init();
     sem_init(&sem, 0);
-    irq_enable_global();
 
-    while (1)
-    {
-        log_printf("init main : %d", cnt++);
-        sem_wakeup(&sem);
-        sys_sleep(1000);
-    }
+    move_to_first_task();
+    // irq_enable_global();
+
+    // while (1)
+    // {
+    //     log_printf("init main : %d", cnt++);
+    //     sem_wakeup(&sem);
+    //     sys_sleep(1000);
+    // }
 }
 
 // 8259 8253
