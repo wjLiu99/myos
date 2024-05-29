@@ -156,7 +156,7 @@ void memory_init(boot_info_t *boot_info)
     mmu_set_page_dir((uint32_t)kernel_page_dir);
 }
 
-// 建立用户空间虚拟内存映射
+// 建立用户空间虚拟内存到物理地址空间映射，写进页表中,完成内核空间映射
 uint32_t memory_create_uvm(void)
 {
     pde_t *page_dir = (pde_t *)addr_alloc_page(&paddr_alloc, 1);
@@ -178,6 +178,7 @@ uint32_t memory_create_uvm(void)
     return (uint32_t)page_dir;
 }
 
+// 给特定页表分配一页空间
 static int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t size, int perm)
 {
     uint32_t curr_vaddr = vaddr;
@@ -207,18 +208,110 @@ static int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t
     return 0;
 }
 
-// 给用户空间分配内存,使用tss段里保存的进程自己的页目录表
+// 给用户空间分配内存,使用tss段里保存的进程自己的页目录表，给指定的虚拟地址分配一页物理内存
+// 主要是用户空间8开头以上的地址
 int memory_alloc_page_for(uint32_t addr, uint32_t size, int perm)
 {
     return memory_alloc_for_page_dir(task_current()->tss.cr3, addr, size, perm);
 }
 
+// 8开头以下的地址
 uint32_t memory_alloc_page(void)
 {
-    // 内核空间虚拟地址与物理地址相同
+    // 内核空间虚拟地址与物理地址相同,addr_alloc_page返回的是物理地址
     return addr_alloc_page(&paddr_alloc, 1);
 }
 
+static pde_t *curr_page_dir(void)
+{
+    return (pde_t *)(task_current()->tss.cr3);
+}
 void memory_free_page(uint32_t addr)
 {
+    // memory_alloc_page分配的直接释放，memory_alloc_page_for分配已经建立了页表映射
+    if (addr < MEM_TASK_BASE)
+    {
+        addr_free_page(&paddr_alloc, addr, 1);
+    }
+    else
+    {
+        pte_t *pte = find_pte(curr_page_dir(), addr, 0);
+        // ASSERT((pte == (pte_t *)0) && pte->present);
+        addr_free_page(&paddr_alloc, pte_addr(pte), 1);
+        pte->v = 0;
+    }
+}
+
+void memory_destory_uvm(uint32_t page_dir)
+{
+    // 内核空间映射所有进程都是一样的所以不能释放物理空间
+    uint32_t user_pde_start = pde_index(MEM_TASK_BASE);
+    pde_t *pde = (pde_t *)page_dir + user_pde_start;
+    for (int i = user_pde_start; i < PDE_CNT; i++, pde++)
+    {
+        if (!pde->present)
+        {
+            continue;
+        }
+        pte_t *pte = (pte_t *)pde_paddr(pde);
+        for (int j = 0; j < PTE_CNT; j++, pte++)
+        {
+            if (!pte->present)
+            {
+                continue;
+            }
+            addr_free_page(&paddr_alloc, pte_addr(pte), 1);
+        }
+        addr_free_page(&paddr_alloc, (uint32_t)pde_paddr(pde), 1);
+    }
+    addr_free_page(&paddr_alloc, page_dir, 1);
+}
+uint32_t memory_copy_uvm(uint32_t page_dir)
+{
+    uint32_t to_page_dir = memory_create_uvm();
+    if (to_page_dir == 0)
+    {
+        goto copy_uvm_failed;
+    }
+
+    uint32_t user_pde_start = pde_index(MEM_TASK_BASE);
+    pde_t *pde = (pde_t *)page_dir + user_pde_start;
+
+    for (int i = user_pde_start; i < PDE_CNT; i++, pde++)
+    {
+        if (!pde->present)
+        {
+            continue;
+        }
+
+        pte_t *pte = (pte_t *)pde_paddr(pde);
+        for (int j = 0; j < PTE_CNT; j++, pte++)
+        {
+            if (!pte->present)
+            {
+                goto copy_uvm_failed;
+            }
+            uint32_t page = addr_alloc_page(&paddr_alloc, 1);
+            if (page == 0)
+            {
+                goto copy_uvm_failed;
+            }
+            uint32_t vaddr = (i << 22) | (j << 12);
+            int err = memory_create_map((pde_t *)to_page_dir, vaddr, page, 1, get_pte_perm(pte));
+            if (err < 0)
+            {
+                goto copy_uvm_failed;
+            }
+
+            kernel_memcpy((void *)page, (void *)vaddr, MEM_PAGE_SIZE);
+        }
+    }
+    return to_page_dir;
+
+copy_uvm_failed:
+    if (to_page_dir)
+    {
+        memory_destory_uvm(to_page_dir);
+    }
+    return -1;
 }

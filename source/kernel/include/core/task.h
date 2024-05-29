@@ -7,6 +7,7 @@
 
 #define TASK_NAME_SIZE 32 // 任务名字长度
 #define TASK_TIME_SLICE_DEFAULT 10
+#define TASK_FLAGS_SYSTEM (1 << 0)
 // 进程控制块
 typedef struct _task_t
 {
@@ -20,6 +21,8 @@ typedef struct _task_t
         TASK_WAITING,
         TASK_ZOMBIE,
     } state;
+    int pid;
+    struct _task_t *parent;
     int sleep_ticks; // 延时节拍数
     int time_ticks;
     int slice_ticks; // 进程能运行的最大时钟节拍次数
@@ -32,7 +35,7 @@ typedef struct _task_t
     uint16_t tss_sel; // tss选择子
 } task_t;
 
-int task_init(task_t *task, const char *name, uint32_t entry, uint32_t esp);
+int task_init(task_t *task, const char *name, int flag, uint32_t entry, uint32_t esp);
 void task_switch_from_to(task_t *from, task_t *to);
 
 // 任务管理器
@@ -61,4 +64,10 @@ void sys_sleep(uint32_t ms);
 void task_set_sleep(task_t *task, uint32_t ticks);
 void task_set_wakeup(task_t *task);
 void task_time_tick();
+int sys_getpid(void);
+int sys_fork(void);
+
+static task_t *alloc_task(void);
+
+static void free_task(task_t *task);
 #endif

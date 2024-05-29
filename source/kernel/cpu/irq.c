@@ -146,11 +146,11 @@ void do_handler_page_fault(exception_frame_t *frame)
     log_printf("IRQ/Exception happend: Page fault.");
     if (frame->error_code & ERR_PAGE_P)
     {
-        log_printf("\tpage-level protection violation: 0x%x.", read_cr2());
+        log_printf("\tpage-level protection violation: 0x%x.", r_cr2());
     }
     else
     {
-        log_printf("\tPage doesn't present 0x%x", read_cr2());
+        log_printf("\tPage doesn't present 0x%x", r_cr2());
     }
 
     if (frame->error_code & ERR_PAGE_WR)
