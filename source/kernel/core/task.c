@@ -8,6 +8,8 @@
 #include "core/memory.h"
 #include "cpu/mmu.h"
 #include "core/syscall.h"
+#include "comm/elf.h"
+#include "fs/fs.h"
 
 static task_manager_t task_manager;
 static task_t task_table[TASK_NR];
@@ -96,7 +98,7 @@ int task_init(task_t *task, const char *name, int flag, uint32_t entry, uint32_t
     list_node_init(&task->wait_node);
 
     irq_state_t state = irq_enter_protection();
-    task_set_ready(task);
+
     list_insert_last(&task_manager.task_list, &task->all_node);
     irq_leave_protection(state);
     return 0;
@@ -119,6 +121,14 @@ void task_uninit(task_t *task)
 
     kernel_memset(task, 0, sizeof(task_t));
 }
+
+void task_start(task_t *task)
+{
+    irq_state_t state = irq_enter_protection();
+    task_set_ready(task);
+    irq_leave_protection(state);
+}
+
 void simple_switch(uint32_t **from, uint32_t *to);
 
 void task_switch_from_to(task_t *from, task_t *to)
@@ -167,7 +177,7 @@ void task_first_init(void)
 
     uint32_t first_start = (uint32_t)first_task_entry;
     task_init(&task_manager.first_task, "first task", 0, first_start, (uint32_t)first_start + alloc_size); // 正在运行的进程不用设置入口地址
-    write_tr(task_manager.first_task.tss_sel);
+
     task_manager.curr_task = &task_manager.first_task;
 
     // 现在cr3已经是进程自己的页表了，tss_init的时候给进程分配了新的页表
@@ -177,6 +187,9 @@ void task_first_init(void)
     // fisrt_start是虚拟地址，在分配完新的页表项后以及完成映射，可以直接写,将代码搬运到0x80000000处
     memory_alloc_page_for(first_start, alloc_size, PTE_P | PTE_W | PTE_U);
     kernel_memcpy((void *)first_start, s_first_task, copy_size);
+    // 加入就绪队列
+    task_start(&task_manager.first_task);
+    write_tr(task_manager.first_task.tss_sel);
 }
 
 task_t *task_first_task(void)
@@ -343,7 +356,7 @@ int sys_fork(void)
     {
         goto fork_failed;
     }
-
+    task_start(child_task);
     return child_task->pid;
 
 fork_failed:
@@ -379,4 +392,127 @@ static void free_task(task_t *task)
     mutex_lock(&task_table_mutex);
     task->name[0] = '\0';
     mutex_unlock(&task_table_mutex);
+}
+
+static int load_phdr(int file, Elf32_Phdr *phdr, uint32_t page_dir)
+{
+    int err = memory_alloc_for_page_dir(page_dir, phdr->p_vaddr, phdr->p_memsz, PTE_P | PTE_U | PTE_W);
+    if (err < 0)
+    {
+        log_printf("no mem");
+        return -1;
+    }
+    if (sys_lseek(file, phdr->p_offset, 0) < 0)
+    {
+        log_printf("read file failed");
+        return -1;
+    }
+    uint32_t vaddr = phdr->p_vaddr;
+    uint32_t size = phdr->p_filesz;
+    // 当前页表还是调用exec函数的进程页表，新页表还未启用,一页一页拷贝，因为在物理空间中并不连续存放
+    while (size > 0)
+    {
+        int curr_size = (size > MEM_PAGE_SIZE) ? MEM_PAGE_SIZE : size;
+        // 找到vaddr在pagedir中的物理地址,将文件读到物理地址中，物理地址和虚拟地址一一映射，但是进程空间虚拟地址可以和内核映射到相同的物理地址
+        uint32_t paddr = memory_get_paddr(page_dir, vaddr);
+        if (sys_read(file, (char *)paddr, curr_size) < curr_size)
+        {
+            log_printf("read file failed");
+            return -1;
+        }
+        size -= curr_size;
+        vaddr += curr_size;
+    }
+    return 0;
+}
+static uint32_t load_elf_file(task_t *task, const char *name, uint32_t page_dir)
+{
+    Elf32_Ehdr elf_hdr;
+    Elf32_Phdr elf_phdr;
+    int file = sys_open(name, 0);
+    if (file < 0)
+    {
+        log_printf("open failed.%s", name);
+        goto load_failed;
+    }
+
+    int cnt = sys_read(file, (char *)&elf_hdr, sizeof(elf_hdr));
+    if (cnt < sizeof(Elf32_Ehdr))
+    {
+        log_printf("elf hdr too small");
+        goto load_failed;
+    }
+
+    if ((elf_hdr.e_ident[0] != 0x7f) || (elf_hdr.e_ident[1] != 'E') ||
+        (elf_hdr.e_ident[2] != 'L') || (elf_hdr.e_ident[3] != 'F'))
+    {
+        log_printf("check elf failed");
+        goto load_failed;
+    }
+
+    uint32_t e_phoff = elf_hdr.e_phoff;
+    for (int i = 0; i < elf_hdr.e_phnum; i++, e_phoff += elf_hdr.e_phentsize)
+    {
+        if (sys_lseek(file, e_phoff, 0) < 0)
+        {
+            log_printf("read file failed");
+            goto load_failed;
+        }
+        cnt = sys_read(file, (char *)&elf_phdr, sizeof(elf_phdr));
+        if (cnt < sizeof(elf_phdr))
+        {
+            log_printf("elf_phdr small");
+            goto load_failed;
+        }
+        if ((elf_phdr.p_type != 1) || (elf_phdr.p_vaddr < MEM_TASK_BASE))
+        {
+            continue;
+        }
+        // 从文件中加载到内存中
+        int err = load_phdr(file, &elf_phdr, page_dir);
+        if (err < 0)
+        {
+            log_printf("load program failed");
+            goto load_failed;
+        }
+    }
+    sys_close(file);
+    return elf_hdr.e_entry;
+
+load_failed:
+    if (file)
+    {
+        sys_close(file);
+    }
+    return 0;
+}
+
+int sys_execve(char *name, char **argv, char **env)
+{
+    task_t *task = task_current();
+    // 创建新页表，销毁旧的页表
+    uint32_t old_page_dir = task->tss.cr3;
+    uint32_t new_page_dir = memory_create_uvm();
+    if (!new_page_dir)
+    {
+        goto exec_failed;
+    }
+    // 加载elf文件到内存并完成页表映射
+    uint32_t entry = load_elf_file(task, name, new_page_dir);
+    if (entry == 0)
+    {
+        goto exec_failed;
+    }
+    task->tss.cr3 = new_page_dir;
+    mmu_set_page_dir(new_page_dir);
+    memory_destory_uvm(old_page_dir);
+
+exec_failed:
+    if (new_page_dir)
+    {
+        task->tss.cr3 = old_page_dir;
+        mmu_set_page_dir(old_page_dir);
+        memory_destory_uvm(new_page_dir);
+    }
+    return -1;
 }

@@ -46,7 +46,8 @@
         "memory": "c",
         "new": "c",
         "functional": "c",
-        "sem.h": "c"
+        "sem.h": "c",
+        "typeinfo": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

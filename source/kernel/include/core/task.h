@@ -66,6 +66,7 @@ void task_set_wakeup(task_t *task);
 void task_time_tick();
 int sys_getpid(void);
 int sys_fork(void);
+int sys_execve(char *name, char **argv, char **env);
 
 static task_t *alloc_task(void);
 

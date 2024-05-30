@@ -13,6 +13,8 @@ int first_task_main(void)
     else if (pid == 0)
     {
         print_msg("im child : %d", getpid());
+        char *argv[] = {"arg0", "arg1"};
+        execve("/shell.elf", argv, (char **)0);
     }
     else
     {

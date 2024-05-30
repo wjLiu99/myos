@@ -179,7 +179,7 @@ uint32_t memory_create_uvm(void)
 }
 
 // 给特定页表分配一页空间
-static int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t size, int perm)
+int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t size, int perm)
 {
     uint32_t curr_vaddr = vaddr;
     int page_count = up2(size, MEM_PAGE_SIZE) / MEM_PAGE_SIZE;
@@ -209,7 +209,7 @@ static int memory_alloc_for_page_dir(uint32_t page_dir, uint32_t vaddr, uint32_t
 }
 
 // 给用户空间分配内存,使用tss段里保存的进程自己的页目录表，给指定的虚拟地址分配一页物理内存
-// 主要是用户空间8开头以上的地址
+// 主要是用户空间8开头以上的地址,为当前运行的任务
 int memory_alloc_page_for(uint32_t addr, uint32_t size, int perm)
 {
     return memory_alloc_for_page_dir(task_current()->tss.cr3, addr, size, perm);
@@ -289,7 +289,7 @@ uint32_t memory_copy_uvm(uint32_t page_dir)
         {
             if (!pte->present)
             {
-                goto copy_uvm_failed;
+                continue;
             }
             uint32_t page = addr_alloc_page(&paddr_alloc, 1);
             if (page == 0)
@@ -314,4 +314,39 @@ copy_uvm_failed:
         memory_destory_uvm(to_page_dir);
     }
     return -1;
+}
+
+uint32_t memory_get_paddr(uint32_t page_dir, uint32_t vaddr)
+{
+    pte_t *pte = find_pte((pde_t *)page_dir, vaddr, 0);
+    if (!pte)
+    {
+        return 0;
+    }
+    return pte_addr(pte) + (vaddr & (MEM_PAGE_SIZE - 1));
+}
+
+// from是在当前页表中，所以进程看到的是连续空间，to是未启用的页表的地址，所以要找到他在页表中的物理地址，再根据在当前页表中虚拟地址和物理地址相同拷贝
+int memory_copy_uvm_data(uint32_t to, uint32_t page_dir, uint32_t from, uint32_t size)
+{
+    while (size > 0)
+    {
+        uint32_t to_paddr = memory_get_paddr(page_dir, to);
+        if (to_paddr == 0)
+        {
+            return -1;
+        }
+        uint32_t offset_in_page = to_paddr & (MEM_PAGE_SIZE - 1);
+        uint32_t curr_size = MEM_PAGE_SIZE - offset_in_page;
+        // 剩余要拷贝的大小要小于当前页剩余的空间，调整拷贝大小
+        if (curr_size > size)
+        {
+            curr_size = size;
+        }
+
+        kernel_memcpy((void *)to_paddr, (void *)from, curr_size);
+        size -= curr_size;
+        to += curr_size;
+        from += curr_size;
+    }
 }
