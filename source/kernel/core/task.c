@@ -162,6 +162,7 @@ void task_manager_init(void)
               TASK_FLAGS_SYSTEM,
               (uint32_t)idle_task_entry,
               (uint32_t)(&idle_task_stack[1024]));
+    task_start(&task_manager.idle_task);
     kernel_memset(task_table, 0, sizeof(task_table));
     mutex_init(&task_table_mutex);
 }
@@ -234,7 +235,7 @@ void task_set_ready(task_t *task)
     task->state = TASK_READY;
 }
 
-int sys_sched_yield(void)
+int sys_yield(void)
 {
     irq_state_t state = irq_enter_protection();
     if (list_count(&task_manager.ready_list) > 1)
@@ -487,9 +488,31 @@ load_failed:
     return 0;
 }
 
+static int copy_args(char *to, uint32_t page_dir, int argc, char **argv)
+{
+    task_args_t task_args;
+    task_args.argc = argc;
+    task_args.argv = (char **)(to + sizeof(task_args_t));
+    // 拷贝参数的起始虚拟地址
+    char *dest_arg = to + sizeof(task_args_t) + sizeof(char *) * argc;
+    // 找到新进程argv的物理地址
+    char **dest_arg_tb = (char **)memory_get_paddr(page_dir, (uint32_t)(to + sizeof(task_args_t)));
+    for (int i = 0; i < argc; i++)
+    {
+        char *from = argv[i];
+        int len = kernel_strlen(from) + 1;
+        // 不同页表之间数据拷贝
+        int err = memory_copy_uvm_data((uint32_t)dest_arg, page_dir, (uint32_t)from, len);
+        ASSERT(err >= 0);
+        dest_arg_tb[i] = dest_arg;
+        dest_arg += len;
+    }
+    memory_copy_uvm_data((uint32_t)to, page_dir, (uint32_t)&task_args, sizeof(task_args_t));
+}
 int sys_execve(char *name, char **argv, char **env)
 {
     task_t *task = task_current();
+    kernel_strncpy(task->name, get_file_name(name), TASK_NAME_SIZE);
     // 创建新页表，销毁旧的页表
     uint32_t old_page_dir = task->tss.cr3;
     uint32_t new_page_dir = memory_create_uvm();
@@ -503,9 +526,35 @@ int sys_execve(char *name, char **argv, char **env)
     {
         goto exec_failed;
     }
+    // 为进程分配新的栈
+    uint32_t stack_top = MEM_TASK_STACK_TOP - MEM_TASK_ARG_SIZE;
+    int err = memory_alloc_for_page_dir(new_page_dir, MEM_TASK_STACK_TOP - MEM_TASK_STACK_SIZE,
+                                        MEM_TASK_STACK_SIZE, PTE_P | PTE_U | PTE_W);
+    if (err < 0)
+    {
+        goto exec_failed;
+    }
+
+    int argc = strings_count(argv);
+    err = copy_args((char *)stack_top, new_page_dir, argc, argv);
+    if (err < 0)
+    {
+        goto exec_failed;
+    }
+
+    // 修改eip跳转到elf文件运行
+    syscall_frame_t *frame = (syscall_frame_t *)(task->tss.esp0 - sizeof(syscall_frame_t));
+    frame->eip = entry;
+
+    frame->eax = frame->ebx = frame->ecx = frame->edx = 0;
+    frame->esi = frame->edi = frame->ebp = 0;
+    frame->eflags = EFLAGS_IF | EFLAGS_DEFAULT;
+    frame->esp = stack_top - SYSCALL_PARAM_COUNT * sizeof(uint32_t);
+
     task->tss.cr3 = new_page_dir;
     mmu_set_page_dir(new_page_dir);
     memory_destory_uvm(old_page_dir);
+    return 0;
 
 exec_failed:
     if (new_page_dir)
