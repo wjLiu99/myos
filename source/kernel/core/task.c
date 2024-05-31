@@ -77,6 +77,8 @@ int task_init(task_t *task, const char *name, int flag, uint32_t entry, uint32_t
     task->pid = (uint32_t)task;
     task->parent = (task_t *)0;
     ASSERT(task != (task_t *)0);
+    task->heap_start = 0;
+    task->heap_end = 0;
     tss_init(task, flag, entry, esp);
     kernel_strncpy(task->name, name, TASK_NAME_SIZE);
     task->state = TASK_CREATED;
@@ -178,7 +180,8 @@ void task_first_init(void)
 
     uint32_t first_start = (uint32_t)first_task_entry;
     task_init(&task_manager.first_task, "first task", 0, first_start, (uint32_t)first_start + alloc_size); // 正在运行的进程不用设置入口地址
-
+    task_manager.first_task.heap_start = (uint32_t)e_first_task;
+    task_manager.first_task.heap_end = (uint32_t)e_first_task;
     task_manager.curr_task = &task_manager.first_task;
 
     // 现在cr3已经是进程自己的页表了，tss_init的时候给进程分配了新的页表
@@ -476,6 +479,8 @@ static uint32_t load_elf_file(task_t *task, const char *name, uint32_t page_dir)
             log_printf("load program failed");
             goto load_failed;
         }
+        task->heap_start = elf_phdr.p_vaddr + elf_phdr.p_memsz;
+        task->heap_end = task->heap_start;
     }
     sys_close(file);
     return elf_hdr.e_entry;

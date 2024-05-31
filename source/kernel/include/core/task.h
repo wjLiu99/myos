@@ -22,6 +22,8 @@ typedef struct _task_t
         TASK_ZOMBIE,
     } state;
     int pid;
+    uint32_t heap_start;
+    uint32_t heap_end;
     struct _task_t *parent;
     int sleep_ticks; // 延时节拍数
     int time_ticks;
