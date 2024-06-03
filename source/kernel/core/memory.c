@@ -2,7 +2,7 @@
 #include "tools/log.h"
 #include "tools/kernellib.h"
 #include "cpu/mmu.h"
-
+#include "dev/console.h"
 static addr_alloc_t paddr_alloc;
 static pde_t kernel_page_dir[PDE_CNT] __attribute__((aligned(MEM_PAGE_SIZE)));
 // 初始化内存分配
@@ -117,6 +117,7 @@ void create_kernel_table(void)
         {0, s_text, 0, PTE_W},
         {s_text, e_text, s_text, 0},
         {s_data, (void *)MEM_EBDA_START, s_data, PTE_W},
+        {(void *)CONSOLE_DISP_ADDR, (void *)CONSOLE_DISP_END, (void *)CONSOLE_DISP_ADDR, PTE_W},
         {(void *)MEM_EXT_START, (void *)MEM_EXT_END, (void *)MEM_EXT_START, PTE_W}};
 
     for (int i = 0; i < sizeof(kernel_map) / sizeof(memory_map_t); i++)

@@ -11,17 +11,21 @@
 #include "tools/list.h"
 #include "ipc/sem.h"
 #include "core/memory.h"
+#include "dev/console.h"
+#include "dev/kbd.h"
 
 void kernel_init(boot_info_t *boot_info)
 {
 
     cpu_init();
     log_init();
+    console_init();
     memory_init(boot_info);
 
     irq_init();
     time_init();
     task_manager_init();
+    kbd_init();
 }
 
 static task_t init_task;
