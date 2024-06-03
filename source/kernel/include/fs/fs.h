@@ -10,4 +10,5 @@ int sys_close(int file);
 int sys_isatty(int file);
 
 int sys_fstat(int file, struct stat *st);
+void fs_init(void);
 #endif

@@ -57,11 +57,17 @@ static const key_map_t map_table[256] = {
     [0x35] = {'/', '?'},
     [0x39] = {' ', ' '},
 };
+
 void kbd_init(void)
 {
-    kernel_memset(&kbd_stat, 0, sizeof(kbd_stat));
-    irq_install(IRQ1_KEYBOARD, (irq_handler_t)exception_handler_kbd);
-    irq_enable(IRQ1_KEYBOARD);
+    static int inited = 0;
+    if (!inited)
+    {
+        kernel_memset(&kbd_stat, 0, sizeof(kbd_stat));
+        irq_install(IRQ1_KEYBOARD, (irq_handler_t)exception_handler_kbd);
+        irq_enable(IRQ1_KEYBOARD);
+        inited = 1;
+    }
 }
 static inline int is_make_code(uint8_t code)
 {

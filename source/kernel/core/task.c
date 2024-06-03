@@ -98,6 +98,7 @@ int task_init(task_t *task, const char *name, int flag, uint32_t entry, uint32_t
     list_node_init(&task->all_node);
     list_node_init(&task->run_node);
     list_node_init(&task->wait_node);
+    kernel_memset(&task->file_table, 0, sizeof(task->file_table));
 
     irq_state_t state = irq_enter_protection();
 
@@ -567,6 +568,38 @@ exec_failed:
         task->tss.cr3 = old_page_dir;
         mmu_set_page_dir(old_page_dir);
         memory_destory_uvm(new_page_dir);
+    }
+    return -1;
+}
+
+void task_remove_fd(int fd)
+{
+
+    if ((fd >= 0) && (fd < TASK_OFILE_NR))
+    {
+        task_current()->file_table[fd] = (file_t *)0;
+    }
+}
+file_t *task_file(int fd)
+{
+    if ((fd >= 0) && (fd < TASK_OFILE_NR))
+    {
+        file_t *file = task_current()->file_table[fd];
+        return file;
+    }
+    return (file_t *)0;
+}
+int task_alloc_fd(file_t *file)
+{
+    task_t *task = task_current();
+    for (int i = 0; i < TASK_OFILE_NR; i++)
+    {
+        file_t *p = task->file_table[i];
+        if (p == (file_t *)0)
+        {
+            task->file_table[i] = file;
+            return i;
+        }
     }
     return -1;
 }

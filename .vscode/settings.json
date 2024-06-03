@@ -47,7 +47,12 @@
         "new": "c",
         "functional": "c",
         "sem.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "array": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "dev.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

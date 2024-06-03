@@ -4,10 +4,12 @@
 #include "cpu/cpu.h"
 #include "comm/types.h"
 #include "tools/list.h"
+#include "fs/file.h"
 
 #define TASK_NAME_SIZE 32 // 任务名字长度
 #define TASK_TIME_SLICE_DEFAULT 10
 #define TASK_FLAGS_SYSTEM (1 << 0)
+#define TASK_OFILE_NR 128
 // 进程控制块
 typedef struct _task_t
 {
@@ -22,6 +24,7 @@ typedef struct _task_t
         TASK_ZOMBIE,
     } state;
     int pid;
+    file_t *file_table[TASK_OFILE_NR];
     uint32_t heap_start;
     uint32_t heap_end;
     struct _task_t *parent;

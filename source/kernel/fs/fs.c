@@ -4,6 +4,7 @@
 #include "comm/cpu_int.h"
 #include "comm/boot_info.h"
 #include "dev/console.h"
+#include "fs/file.h"
 static void read_disk(uint32_t sector, uint32_t sector_cnt, uint8_t *buf)
 {
     // 写入扇区数高8位和LBA4-6
@@ -58,12 +59,15 @@ int sys_read(int file, char *ptr, int len)
     return -1;
 }
 #include <tools/log.h>
-
+void fs_init(void)
+{
+    file_table_init();
+}
 int sys_write(int file, char *ptr, int len)
 {
-    // ptr[len] = '\0';
-    // log_printf("%s", ptr);
-    console_write(0, ptr, len);
+    ptr[len] = '\0';
+    log_printf("%s", ptr);
+    // console_write(0, ptr, len);
     return -1;
 }
 int sys_lseek(int file, int ptr, int dir)
