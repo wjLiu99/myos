@@ -62,6 +62,10 @@ typedef struct _task_args_t
     uint32_t argc;
     char **argv;
 } task_args_t;
+void task_remove_fd(int fd);
+file_t *task_file(int fd);
+int task_alloc_fd(file_t *file);
+
 void task_manager_init(void);
 void task_first_init(void);
 task_t *task_first_task(void);

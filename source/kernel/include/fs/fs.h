@@ -11,4 +11,5 @@ int sys_isatty(int file);
 
 int sys_fstat(int file, struct stat *st);
 void fs_init(void);
+int sys_dup(int file);
 #endif

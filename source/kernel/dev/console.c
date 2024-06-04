@@ -2,28 +2,38 @@
 #include "tools/kernellib.h"
 #include "comm/cpu_int.h"
 #include "dev/tty.h"
+#include "cpu/irq.h"
 #define CONSOLE_NR 8
+
 static console_t console_buf[CONSOLE_NR];
+static int curr_console_idx = 0;
 
 // 读取光标位置
 static int read_cursor_pos(void)
 {
     int pos;
+    irq_state_t state = irq_enter_protection();
     outb(0x3d4, 0xf);
     pos = inb(0x3d5);
     outb(0x3d4, 0xe);
     pos |= (inb(0x3d5) << 8);
+    irq_leave_protection(state);
     return pos;
 }
 
 // 写入光标位置
 static int updata_cursor_pos(console_t *console)
 {
-    int pos = console->cursor_row * console->display_cols + console->cursor_col;
+    int pos = (console - console_buf) * console->display_cols * console->display_rows;
+
+    pos += console->cursor_row * console->display_cols + console->cursor_col;
+    irq_state_t state = irq_enter_protection();
     outb(0x3d4, 0xf);
     outb(0x3d5, (uint8_t)(pos & 0xff));
     outb(0x3d4, 0xe);
+
     outb(0x3d5, (uint8_t)((pos >> 8) & 0xff));
+    irq_leave_protection(state);
     return pos;
 }
 // 擦除
@@ -152,7 +162,7 @@ int console_init(int idx)
         console->cursor_row = 0;
         console->cursor_col = 0;
         clear_display(console);
-        updata_cursor_pos(console);
+        // updata_cursor_pos(console);
     }
 
     console->old_cursor_col = 0;
@@ -391,11 +401,30 @@ int console_write(tty_t *tty)
         }
         len++;
     } while (1);
+    if (tty->console_idx == curr_console_idx)
+    {
+        updata_cursor_pos(c);
+    }
 
-    updata_cursor_pos(c);
     return len;
 }
 
 void console_close(int console)
 {
+}
+void console_select(int idx)
+{
+    console_t *console = console_buf + idx;
+    if (console->disp_base == 0)
+    {
+        console_init(idx);
+    }
+    uint16_t pos = idx * console->display_rows * console->display_cols;
+    // 向端口写入显示位置
+    outb(0x3d4, 0xc);
+    outb(0x3d5, (uint8_t)(pos >> 8) & 0xff);
+    outb(0x3d4, 0xd);
+    outb(0x3d5, (uint8_t)(pos & 0xff));
+    curr_console_idx = idx;
+    updata_cursor_pos(console);
 }

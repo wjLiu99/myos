@@ -64,5 +64,6 @@ int console_init(int idx);
 // int console_write(int console, char *data, int size);
 int console_write(tty_t *tty);
 void console_close(int console);
+void console_select(int idx);
 
 #endif

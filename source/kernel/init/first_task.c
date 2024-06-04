@@ -1,8 +1,10 @@
 #include "core/task.h"
 #include "tools/log.h"
 #include "applib/lib_syscall.h"
+#include "dev/tty.h"
 int first_task_main(void)
 {
+#if 0
     int count = 3;
     int pid = getpid();
     pid = fork();
@@ -21,9 +23,30 @@ int first_task_main(void)
         print_msg("child : %d", pid);
         print_msg("parent : %d", count);
     }
+#endif
+    for (int i = 0; i < 8; i++)
+    {
+        int pid = fork();
+        if (pid < 0)
+        {
+            print_msg("creat shell failed", 0);
+            break;
+        }
+        else if (pid == 0)
+        {
+            char tty_num[5] = "tty:?";
+            tty_num[4] = i + '0';
+            char *argv[] = {tty_num, (char *)0};
+            execve("/shell.elf", argv, (char **)0);
+            while (1)
+            {
+                msleep(1000);
+            }
+        }
+    }
     while (1)
     {
-        print_msg("first task id = %d.", pid);
+        // print_msg("first task id = %d.", pid);
         msleep(1000);
     }
     return 0;

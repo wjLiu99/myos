@@ -25,6 +25,12 @@ file_t *file_alloc(void)
 }
 void file_free(file_t *file)
 {
+    mutex_lock(&file_alloc_mutex);
+    if (file->ref)
+    {
+        file->ref--;
+    }
+    mutex_unlock(&file_alloc_mutex);
 }
 void file_table_init(void)
 {

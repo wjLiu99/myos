@@ -18,6 +18,7 @@
 #define SYS_isatty 45
 #define SYS_fstat 46
 #define SYS_sbrk 47
+#define SYS_dup 48
 
 typedef struct _syscall_frame_t
 {

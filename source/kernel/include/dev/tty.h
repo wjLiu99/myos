@@ -13,6 +13,8 @@ typedef struct _tty_fifo_t
     int count;
 } tty_fifo_t;
 #define TTY_OCRLF (1 << 0)
+#define TTY_INCLR (1 << 0)
+#define TTY_IECHO (1 << 1)
 // tty设备
 typedef struct _tty_t
 {
@@ -21,10 +23,15 @@ typedef struct _tty_t
     sem_t osem;
     char ibuf[TTY_IBUF_SIZE];
     tty_fifo_t ififo;
+    sem_t isem;
+    int iflags;
     int oflags;
     int console_idx;
 } tty_t;
 
 int tty_fifo_put(tty_fifo_t *fifo, char c);
 int tty_fifo_get(tty_fifo_t *fifo, char *c);
+
+void tty_in(char ch);
+void tty_select(int tty);
 #endif

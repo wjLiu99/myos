@@ -3,6 +3,7 @@
 #include "tools/log.h"
 #include "comm/cpu_int.h"
 #include "tools/kernellib.h"
+#include "dev/tty.h"
 static kbd_state_t kbd_stat;
 static const key_map_t map_table[256] = {
     [0x2] = {'1', '!'},
@@ -58,6 +59,14 @@ static const key_map_t map_table[256] = {
     [0x39] = {' ', ' '},
 };
 
+static void do_fx_key(int key)
+{
+    int idx = key - KEY_F1;
+    if (kbd_stat.lctrl_press || kbd_stat.rctrl_press)
+    {
+        tty_select(idx);
+    }
+}
 void kbd_init(void)
 {
     static int inited = 0;
@@ -110,6 +119,8 @@ static void do_normal_key(uint8_t raw_code)
     case KEY_F6:
     case KEY_F7:
     case KEY_F8:
+        do_fx_key(key);
+        break;
     case KEY_F9:
     case KEY_F10:
     case KEY_F11:
@@ -138,7 +149,8 @@ static void do_normal_key(uint8_t raw_code)
                     key = key - 'a' + 'A';
                 }
             }
-            log_printf("key :%c", key);
+            tty_in(key);
+            // log_printf("key :%c", key);
         }
         break;
     }
