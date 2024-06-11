@@ -172,6 +172,7 @@ int console_init(int idx)
     console->background = COLOR_Black;
     console->disp_base = (disp_char_t *)CONSOLE_DISP_ADDR + idx * (CONSOLE_ROW_MAX * CONSOLE_COL_MAX);
     // clear_display(console);
+    mutex_init(&console->mutex);
 
     return 0;
 }
@@ -374,6 +375,7 @@ int console_write(tty_t *tty)
 {
     console_t *c = console_buf + tty->console_idx;
     int len = 0;
+    mutex_lock(&c->mutex);
     do
     {
         char ch;
@@ -401,6 +403,7 @@ int console_write(tty_t *tty)
         }
         len++;
     } while (1);
+    mutex_unlock(&c->mutex);
     if (tty->console_idx == curr_console_idx)
     {
         updata_cursor_pos(c);

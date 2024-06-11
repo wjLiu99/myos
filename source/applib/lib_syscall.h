@@ -33,6 +33,7 @@ int lseek(int file, int ptr, int dir);
 int isatty(int file);
 int fstat(int file, struct stat *st);
 void *sbrk(ptrdiff_t incr);
-
+void _exit(int status);
+int wait(int *status);
 int dup(int file);
 #endif

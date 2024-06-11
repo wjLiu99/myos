@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "lib_syscall.h"
 int main(int argc, char **argv);
 extern uint8_t __bss_start__[], __bss_end__[];
 void cstart(int argc, char **argv)
@@ -8,5 +9,5 @@ void cstart(int argc, char **argv)
     {
         *start++;
     }
-    main(argc, argv);
+    _exit(main(argc, argv));
 }

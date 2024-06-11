@@ -120,7 +120,7 @@ int tty_write(device_t *dev, int addr, char *buf, int size)
         console_write(tty);
     }
 
-    return size;
+    return len;
 }
 
 int tty_read(device_t *dev, int addr, char *buf, int size)

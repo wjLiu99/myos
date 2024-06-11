@@ -3,9 +3,11 @@
 #include "tools/kernellib.h"
 #define DEV_TABLE_SIZE 128
 extern dev_desc_t dev_tty_desc;
+extern dev_desc_t dev_disk_desc;
 // 系统支持的设备
 static dev_desc_t *dev_desc_tbl[] = {
     &dev_tty_desc,
+    &dev_disk_desc,
 };
 // 系统打开设备表，类似进程的文件描述符
 static device_t dev_tbl[DEV_TABLE_SIZE];

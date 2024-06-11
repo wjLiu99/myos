@@ -3,6 +3,7 @@
 
 #include "comm/types.h"
 #include "dev/tty.h"
+#include "ipc/mutex.h"
 
 #define CONSOLE_DISP_ADDR 0xb8000
 #define CONSOLE_DISP_END (0xb8000 + 32 * 1024)
@@ -57,6 +58,7 @@ typedef struct _console_t
     int old_cursor_row, old_cursor_col;
     int esc_param[ESC_PARAM_MAX]; // esc参数缓冲区
     int curr_param_index;
+    mutex_t mutex;
 
 } console_t;
 

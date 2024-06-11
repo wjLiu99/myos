@@ -53,7 +53,8 @@
         "initializer_list": "c",
         "utility": "c",
         "dev.h": "c",
-        "kbd.h": "c"
+        "kbd.h": "c",
+        "boot_info.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

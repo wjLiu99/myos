@@ -24,7 +24,7 @@ int first_task_main(void)
         print_msg("parent : %d", count);
     }
 #endif
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < 1; i++)
     {
         int pid = fork();
         if (pid < 0)
@@ -34,8 +34,8 @@ int first_task_main(void)
         }
         else if (pid == 0)
         {
-            char tty_num[5] = "tty:?";
-            tty_num[4] = i + '0';
+            char tty_num[] = "/dev/tty?";
+            tty_num[sizeof(tty_num) - 2] = i + '0';
             char *argv[] = {tty_num, (char *)0};
             execve("/shell.elf", argv, (char **)0);
             while (1)

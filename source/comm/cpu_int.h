@@ -24,13 +24,18 @@ static inline uint16_t inw(uint16_t port)
     __asm__ __volatile__("in %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
     return ret;
 }
+
 // 写端口
 static inline void outb(uint16_t port, uint8_t data)
 {
 
     __asm__ __volatile__("outb %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
 }
+static inline void outw(uint16_t port, uint16_t data)
+{
 
+    __asm__ __volatile__("out %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
+}
 // 加载全局描述符表GDT
 static inline void lgdt(uint32_t start, uint32_t size)
 {

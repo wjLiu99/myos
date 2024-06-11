@@ -3,7 +3,7 @@
 #include "comm/boot_info.h"
 #include "comm/types.h"
 #include "comm/cpu_int.h"
-#define SECTOR_SIZE 512
+
 #define ELFFILE_LOADADDR (1024 * 1024)
 // 声明汇编全局函数
 void entry_protect_mode(void);

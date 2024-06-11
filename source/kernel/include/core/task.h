@@ -25,6 +25,7 @@ typedef struct _task_t
     } state;
     int pid;
     file_t *file_table[TASK_OFILE_NR];
+    int status;
     uint32_t heap_start;
     uint32_t heap_end;
     struct _task_t *parent;
@@ -83,6 +84,9 @@ void task_time_tick();
 int sys_getpid(void);
 int sys_fork(void);
 int sys_execve(char *name, char **argv, char **env);
+
+void sys_exit(int status);
+int sys_wait(int *status);
 
 static task_t *alloc_task(void);
 
