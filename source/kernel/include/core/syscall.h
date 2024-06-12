@@ -21,6 +21,9 @@
 #define SYS_fstat 46
 #define SYS_sbrk 47
 #define SYS_dup 48
+#define SYS_opendir 49
+#define SYS_readdir 50
+#define SYS_closedir 51
 
 typedef struct _syscall_frame_t
 {

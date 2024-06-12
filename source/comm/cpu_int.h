@@ -12,29 +12,64 @@ static inline void sti(void)
     __asm__ __volatile__("sti");
 }
 // 读端口
+// static inline uint8_t inb(uint16_t port)
+// {
+//     uint8_t ret;
+//     __asm__ __volatile__("inb %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
+//     return ret;
+// }
+
+// static inline uint16_t inw(uint16_t port)
+// {
+//     uint16_t rv;
+//     __asm__ __volatile__("in %1, %0" : "=a"(rv) : "dN"(port));
+//     return rv;
+// }
+// 写端口
+// static inline void outb(uint16_t port, uint8_t data)
+// {
+
+//     __asm__ __volatile__("outb %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
+// }
+// static inline void outw(uint16_t port, uint16_t data)
+// {
+
+//     __asm__ __volatile__("out %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
+// }
 static inline uint8_t inb(uint16_t port)
 {
-    uint8_t ret;
-    __asm__ __volatile__("inb %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
-    return ret;
+    uint8_t rv;
+    __asm__ __volatile__("inb %[p], %[v]" : [v] "=a"(rv) : [p] "d"(port));
+    return rv;
 }
+
 static inline uint16_t inw(uint16_t port)
 {
-    uint16_t ret;
-    __asm__ __volatile__("in %[p],%[r]" : [r] "=a"(ret) : [p] "d"(port));
-    return ret;
+    uint16_t rv;
+    __asm__ __volatile__("in %1, %0" : "=a"(rv) : "dN"(port));
+    return rv;
 }
 
-// 写端口
+static inline uint32_t inl(uint16_t port)
+{
+    uint32_t rv;
+    __asm__ __volatile__("inl %1, %0" : "=a"(rv) : "dN"(port));
+    return rv;
+}
+
 static inline void outb(uint16_t port, uint8_t data)
 {
-
-    __asm__ __volatile__("outb %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
+    __asm__ __volatile__("outb %[v], %[p]" : : [p] "d"(port), [v] "a"(data));
 }
+
 static inline void outw(uint16_t port, uint16_t data)
 {
+    __asm__ __volatile__("out %[v], %[p]" : : [p] "d"(port), [v] "a"(data));
+}
 
-    __asm__ __volatile__("out %[d],%[p]" ::[d] "a"(data), [p] "d"(port));
+static inline void outl(uint16_t port, uint32_t data)
+{
+    __asm__ __volatile__("outl %[v], %[p]" : : [p] "d"(port), [v] "a"(data));
 }
 // 加载全局描述符表GDT
 static inline void lgdt(uint32_t start, uint32_t size)

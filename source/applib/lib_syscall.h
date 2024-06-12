@@ -36,4 +36,22 @@ void *sbrk(ptrdiff_t incr);
 void _exit(int status);
 int wait(int *status);
 int dup(int file);
+
+struct dirent
+{
+    int index;
+    int type;
+    char name[255];
+    int size;
+};
+
+typedef struct _DIR
+{
+    int index;
+    struct dirent dirent;
+} DIR;
+
+DIR *opendir(const char *path);
+struct dirent *readdir(DIR *dir);
+int closedir(DIR *dir);
 #endif

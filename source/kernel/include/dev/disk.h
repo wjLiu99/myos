@@ -87,14 +87,17 @@ typedef struct _disk_t
     char name[DISK_NAME_SIZE];
     enum
     {
-        DISK_MASTER,
-        DISK_SLAVE
+        DISK_MASTER = (0 << 4),
+        DISK_SLAVE = (1 << 4),
     } drive;
 
     uint16_t port_base;
     int sector_size;
     int sector_count;
     partinfo_t partinfo[DISK_PRIMARY_CNT];
+
+    mutex_t *mutex;
+    sem_t *op_sem;
 } disk_t;
 
 void disk_init(void);

@@ -6,6 +6,9 @@
 #include "dev/dev.h"
 #include "cpu/irq.h"
 static disk_t disk_buf[DISK_CNT];
+static mutex_t mutex;
+static sem_t op_sem;
+static int task_on_op;
 
 static void disk_send_cmd(disk_t *disk, uint32_t start_sector, uint32_t sector_count, int cmd)
 {
@@ -146,12 +149,16 @@ void disk_init(void)
 {
     log_printf("check disk...");
     kernel_memset(disk_buf, 0, sizeof(disk_buf));
+    mutex_init(&mutex);
+    sem_init(&op_sem, 0);
     for (int i = 0; i < DISK_PER_CHANNEL; i++)
     {
         disk_t *disk = disk_buf + i;
         kernel_sprintf(disk->name, "sd%c", i + 'a');
         disk->drive = (i == 0) ? DISK_MASTER : DISK_SLAVE;
         disk->port_base = IOBASE_PRIMARY;
+        disk->mutex = &mutex;
+        disk->op_sem = &op_sem;
 
         int err = identify_disk(disk);
         if (err == 0)
@@ -194,14 +201,94 @@ int disk_open(device_t *dev)
 void do_handler_ide_primary(exception_frame_t *frame)
 {
     pic_send_eoi(IRQ14_HARDDISK_PRIMARY);
+    if (task_on_op == 1 && task_current())
+    {
+        sem_wakeup(&op_sem);
+    }
 }
 
+// 可以用disk内的锁也可以用全局锁,start_sector是相对与扇区的扇区号
 int disk_read(device_t *dev, int start_sector, char *buf, int count)
 {
+    // 取分区信息
+    partinfo_t *part_info = (partinfo_t *)dev->data;
+    if (!part_info)
+    {
+        log_printf("Get part info failed! device = %d", dev->minor);
+        return -1;
+    }
+
+    disk_t *disk = part_info->disk;
+    if (disk == (disk_t *)0)
+    {
+        log_printf("No disk for device %d", dev->minor);
+        return -1;
+    }
+
+    mutex_lock(disk->mutex);
+    task_on_op = 1;
+
+    int cnt;
+    disk_send_cmd(disk, part_info->start_sector + start_sector, count, DISK_CMD_READ);
+    for (cnt = 0; cnt < count; cnt++, buf += disk->sector_size)
+    {
+        // 利用信号量等待中断通知，然后再读取数据
+        if (task_current())
+        {
+            sem_wait(disk->op_sem);
+        }
+
+        // 这里虽然有调用等待，但是由于已经是操作完毕，所以并不会等
+        int err = disk_wait_data(disk);
+        if (err < 0)
+        {
+            log_printf("disk(%s) read error: start sect %d, count %d", disk->name, start_sector, count);
+            break;
+        }
+
+        // 此处再读取数据
+        disk_read_data(disk, buf, disk->sector_size);
+    }
+
+    mutex_unlock(disk->mutex);
+    return cnt;
 }
 
 int disk_write(device_t *dev, int start_sector, char *buf, int count)
 {
+    partinfo_t *part_info = (partinfo_t *)dev->data;
+    if (!part_info)
+    {
+        log_printf("get part info failed.devicr :%d", dev->minor);
+    }
+
+    disk_t *disk = part_info->disk;
+    if (disk == (disk_t *)0)
+    {
+        log_printf("no disk.device : %d", dev->minor);
+    }
+    mutex_lock(disk->mutex);
+    task_on_op = 1;
+    int cnt;
+    disk_send_cmd(disk, part_info->start_sector + start_sector, count, DISK_CMD_WRITE);
+
+    for (cnt = 0; cnt < count; cnt++, buf += disk->sector_size)
+    {
+        disk_write_data(disk, buf, disk->sector_size);
+        if (task_current())
+        {
+            sem_wait(disk->op_sem);
+        }
+
+        int err = disk_wait_data(disk);
+        if (err < 0)
+        {
+            log_printf("disk(%s)read error:start sector %d,count %d", disk->name, start_sector, count);
+            break;
+        }
+    }
+    mutex_unlock(disk->mutex);
+    return cnt;
 }
 
 int disk_control(device_t *dev, int cmd, int arg0, int arg1)

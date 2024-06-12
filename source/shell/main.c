@@ -5,6 +5,7 @@
 #include "main.h"
 #include <getopt.h>
 #include <sys/file.h>
+#include "fs/file.h"
 static cli_t cli;
 static const char *promot = "sh >>";
 char cmd_buf[256];
@@ -80,6 +81,72 @@ static int do_exit(int argc, char **argv)
     exit(0);
     return 0;
 }
+static int do_ls(int argc, char **argv)
+{
+    DIR *p_dir = opendir("temp");
+    if (p_dir == NULL)
+    {
+        printf("opendir failed.");
+        return -1;
+    }
+    struct dirent *entry;
+    while ((entry = readdir(p_dir)) != NULL)
+    {
+        printf("%c %s %d",
+               entry->type == FILE_DIR ? 'd' : 'f', entry->name, entry->size);
+    }
+    closedir(p_dir);
+    return 0;
+}
+
+static int do_less(int argc, char **argv)
+{
+
+    int ch;
+    optind = 1;
+    while ((ch = getopt(argc, argv, "l:h")) != -1)
+    {
+        switch (ch)
+        {
+        case 'h':
+            puts("show file content\n");
+            return 0;
+
+        case '?':
+
+            if (optarg)
+            {
+                fprintf(stderr, "unknown option %s\n", optarg);
+            }
+
+            return -1;
+
+        default:
+            break;
+        }
+    }
+    if (optind > argc - 1)
+    {
+        fprintf(stderr, "no file\n");
+
+        return -1;
+    }
+
+    FILE *file = fopen(argv[optind], 'r');
+    if (file == NULL)
+    {
+        fprintf(stderr, "open file failed.%s", argv[optind]);
+        return -1;
+    }
+
+    char *buf = (char *)malloc(255);
+    while (fgets(buf, 255, file) != NULL)
+    {
+        fputs(buf, stdout);
+    }
+    fclose(file);
+    return 0;
+}
 static const cli_cmd_t cmd_list[] = {
     {
         .name = "help",
@@ -101,7 +168,16 @@ static const cli_cmd_t cmd_list[] = {
         .usage = "quit from shell",
         .do_func = do_exit,
     },
-};
+    {
+        .name = "ls",
+        .usage = "ls --list director",
+        .do_func = do_ls,
+    },
+    {
+        .name = "less",
+        .usage = "less [-l] file -- show file",
+        .do_func = do_less,
+    }};
 
 static void cli_init(const char *promot, const cli_cmd_t *cmd_list, int size)
 {
@@ -232,6 +308,6 @@ int main(int argc, char **argv)
         }
         run_exec_file("", argc, argv);
 
-        fprintf(stderr, ESC_COLOR_ERROR "Unknown command :%s" ESC_COLOR_DEFAULT, cli.curr_input);
+        fprintf(stderr, ESC_COLOR_ERROR "Unknown command :%s\n" ESC_COLOR_DEFAULT, cli.curr_input);
     }
 }

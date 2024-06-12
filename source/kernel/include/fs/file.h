@@ -7,6 +7,8 @@ typedef enum _file_type_t
 {
     FILE_UNKNOWN = 0,
     FILE_TTY,
+    FILE_DIR,
+    FILE_NORMAL,
 } file_type_t;
 
 typedef struct _file_t
@@ -19,6 +21,10 @@ typedef struct _file_t
     int pos;
     int mode;
     struct _fs_t *fs;
+
+    int p_index;
+    int sblk; // 簇链
+    int cblk; // 当前读哪个簇
 } file_t;
 
 file_t *file_alloc(void);

@@ -54,7 +54,9 @@
         "utility": "c",
         "dev.h": "c",
         "kbd.h": "c",
-        "boot_info.h": "c"
+        "boot_info.h": "c",
+        "*.tcc": "c",
+        "condition_variable": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
 }

@@ -10,13 +10,15 @@
 #include <tools/log.h>
 #include <sys/file.h>
 #include "dev/disk.h"
+#include "os_conf.h"
 
 #define FS_TABLE_SIZE 10
 static list_t mounted_list;
 static fs_t fs_table[FS_TABLE_SIZE];
 static list_t free_list;
-
+static fs_t *root_fs;
 extern fs_op_t devfs_op;
+extern fs_op_t fatfs_op;
 int path_to_num(const char *path, int *num)
 {
     int n = 0;
@@ -119,8 +121,11 @@ int sys_open(const char *name, int flags, ...)
 
     if (kernel_strncmp(name, "/shell.elf", 3) == 0)
     {
-        read_disk(5000, 80, (uint8_t *)TEMP_ADDR);
-        temp_pos = (uint8_t *)TEMP_ADDR;
+        // read_disk(5000, 80, (uint8_t *)TEMP_ADDR);
+        // temp_pos = (uint8_t *)TEMP_ADDR;
+        int dev_id = dev_open(DEV_DISK, 0xa0, (void *)0);
+        dev_read(dev_id, 5000, (uint8_t *)TEMP_ADDR, 80);
+        temp_pos = TEMP_ADDR;
         return TEMP_FILE_ID;
     }
 
@@ -154,6 +159,7 @@ int sys_open(const char *name, int flags, ...)
     }
     else
     {
+        fs = root_fs;
     }
 
     file->mode = flags;
@@ -225,6 +231,8 @@ static fs_op_t *get_fs_op(fs_type_t type, int major)
 {
     switch (type)
     {
+    case FS_FAT16:
+        return &(fatfs_op);
     case FS_DEVFS:
         return &(devfs_op);
 
@@ -286,6 +294,9 @@ void fs_init(void)
     disk_init();
     fs_t *fs = mount(FS_DEVFS, "/dev", 0, 0);
     ASSERT(fs != (fs_t *)0);
+
+    root_fs = mount(FS_FAT16, "/home", ROOT_DEV);
+    ASSERT(root_fs != (fs_t *)0);
 }
 int sys_write(int file, char *ptr, int len)
 {
@@ -431,4 +442,27 @@ int sys_dup(int file)
     }
     log_printf("not file ");
     return -1;
+}
+
+int sys_opendir(const char *name, DIR *dir)
+{
+
+    fs_protect(root_fs);
+    int err = root_fs->op->opendir(root_fs, name, dir);
+    fs_unprotect(root_fs);
+    return err;
+}
+int sys_readdir(DIR *dir, struct dirent *dirent)
+{
+    fs_protect(root_fs);
+    int err = root_fs->op->readdir(root_fs, dir, dirent);
+    fs_unprotect(root_fs);
+    return err;
+}
+int sys_closedir(DIR *dir)
+{
+    fs_protect(root_fs);
+    int err = root_fs->op->closedir(root_fs, dir);
+    fs_unprotect(root_fs);
+    return err;
 }
