@@ -3,6 +3,7 @@
 #include "cpu/cpu.h"
 #include "os_conf.h"
 #include "tools/log.h"
+#include "core/task.h"
 #define KERNEL_IDT_NUM 128
 gate_desc_t idt[KERNEL_IDT_NUM];
 static void dump_core_regs(exception_frame_t *frame)
@@ -38,10 +39,17 @@ static void do_default_handler(exception_frame_t *frame, const char *msg)
     log_printf("--------------------------------");
     log_printf("IRQ/Exception happend: %s.", msg);
     dump_core_regs(frame);
-    while (1)
+    if (frame->cs & 0x3)
     {
-        hlt();
-    };
+        sys_exit(frame->error_code);
+    }
+    else
+    {
+        while (1)
+        {
+            hlt();
+        }
+    }
 }
 // 中断处理函数
 void do_handler_unknown(exception_frame_t *frame)
@@ -138,6 +146,17 @@ void do_handler_general_protection(exception_frame_t *frame)
     log_printf("segment index: %d", frame->error_code & 0xFFF8);
 
     dump_core_regs(frame);
+    if (frame->cs & 0x3)
+    {
+        sys_exit(frame->error_code);
+    }
+    else
+    {
+        while (1)
+        {
+            hlt();
+        }
+    }
 }
 
 void do_handler_page_fault(exception_frame_t *frame)
@@ -172,6 +191,19 @@ void do_handler_page_fault(exception_frame_t *frame)
     }
 
     dump_core_regs(frame);
+
+    // 特权3退出程序
+    if (frame->cs & 0x3)
+    {
+        sys_exit(frame->error_code);
+    }
+    else
+    {
+        while (1)
+        {
+            hlt();
+        }
+    }
 }
 
 void do_handler_fpu_error(exception_frame_t *frame)

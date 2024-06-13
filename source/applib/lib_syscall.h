@@ -37,7 +37,7 @@ void *sbrk(ptrdiff_t incr);
 void _exit(int status);
 int wait(int *status);
 int dup(int file);
-
+int unlink(const char *path);
 struct dirent
 {
     int index;

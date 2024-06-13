@@ -27,6 +27,7 @@ typedef struct _fs_op_t
     int (*opendir)(struct _fs_t *fs, const char *name, DIR *dir);
     int (*readdir)(struct _fs_t *fs, DIR *dir, struct dirent *dirent);
     int (*closedir)(struct _fs_t *fs, DIR *dir);
+    int (*unlink)(struct _fs_t *fs, const char *path);
 } fs_op_t;
 
 typedef enum _fs_type_t
@@ -69,4 +70,6 @@ int sys_ioctl(int fd, int cmd, int arg0, int arg1);
 
 int path_to_num(const char *path, int *num);
 const char *path_next_child(const char *path);
+// 删除文件
+int sys_unlink(const char *path);
 #endif

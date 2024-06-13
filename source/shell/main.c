@@ -100,7 +100,58 @@ static int do_ls(int argc, char **argv)
     closedir(p_dir);
     return 0;
 }
+static int do_rm(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        fprintf(stderr, "no file");
+        return -1;
+    }
+    int err = unlink(argv[1]);
+    if (err < 0)
+    {
+        fprintf(stderr, "rm file failed.%s", argv[1]);
+        return err;
+    }
+    return 0;
+}
+static int do_cp(int argc, char **argv)
+{
+    if (argc < 3)
+    {
+        fprintf(stderr, " no from or to");
+        return -1;
+    }
 
+    FILE *from, *to;
+    from = fopen(argv[1], "rb");
+    to = fopen(argv[2], "wb");
+    if (!from || !to)
+    {
+        fprintf(stderr, "open file failed");
+        goto cp_failed;
+    }
+    char *buf = (char *)malloc(255);
+    memset(buf, 0, sizeof(buf));
+    int size = 0;
+    while ((size = fread(buf, 1, 255, from)) > 0)
+    {
+        // fwrite(buf, 1, 255, to);不对
+        fwrite(buf, 1, size, to);
+    }
+    free(buf);
+
+cp_failed:
+    if (from)
+    {
+        fclose(from);
+    }
+    if (to)
+    {
+        fclose(to);
+    }
+    return 0;
+}
 static int do_less(int argc, char **argv)
 {
     int line_mode = 0;
@@ -218,7 +269,18 @@ static const cli_cmd_t cmd_list[] = {
         .name = "less",
         .usage = "less [-l] file -- show file",
         .do_func = do_less,
-    }};
+    },
+    {
+        .name = "cp",
+        .usage = "cp src dest",
+        .do_func = do_cp,
+    },
+    {
+        .name = "rm",
+        .usage = "remove src",
+        .do_func = do_rm,
+    },
+};
 
 static void cli_init(const char *promot, const cli_cmd_t *cmd_list, int size)
 {
@@ -257,7 +319,27 @@ static void run_buildin(const cli_cmd_t *cmd, int argc, char **argv)
         fprintf(stderr, "error:%d\n", ret);
     }
 }
-
+static const char *find_exec_path(const char *filename)
+{
+    static char path[255];
+    int fd = open(filename, 0);
+    if (fd < 0)
+    {
+        sprintf(path, "%s.elf", filename);
+        fd = open(path, 0);
+        if (fd < 0)
+        {
+            return (const char *)0;
+        }
+        close(fd);
+        return path;
+    }
+    else
+    {
+        close(fd);
+        return filename;
+    }
+}
 static void run_exec_file(const char *path, int argc, char **argv)
 {
     int pid = fork();
@@ -267,11 +349,11 @@ static void run_exec_file(const char *path, int argc, char **argv)
     }
     else if (pid == 0)
     {
-        for (int i = 0; i < argc; i++)
+        int err = execve(path, argv, (char *const *)0);
+        if (err < 0)
         {
-            printf("arg %d = %s\n", i, argv[i]);
+            fprintf(stderr, "exec failed :%s ", path);
         }
-        exit(-1);
     }
     else
     {
@@ -349,7 +431,13 @@ int main(int argc, char **argv)
             run_buildin(cmd, argc, argv);
             continue;
         }
-        run_exec_file("", argc, argv);
+
+        const char *path = find_exec_path(argv[0]);
+        if (path)
+        {
+            run_exec_file(path, argc, argv);
+            continue;
+        }
 
         fprintf(stderr, ESC_COLOR_ERROR "Unknown command :%s\n" ESC_COLOR_DEFAULT, cli.curr_input);
     }

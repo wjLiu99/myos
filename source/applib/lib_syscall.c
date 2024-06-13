@@ -35,6 +35,14 @@ void msleep(int ms)
 
     sys_call(&args);
 }
+int unlink(const char *path)
+{
+    syscall_args_t args;
+    args.id = SYS_unlink;
+    args.arg0 = path;
+
+    return sys_call(&args);
+}
 int getpid(void)
 {
     syscall_args_t args;
@@ -57,7 +65,7 @@ int fork(void)
 {
     syscall_args_t args;
     args.id = SYS_fork;
-    sys_call(&args);
+    return sys_call(&args);
 }
 int execve(const char *name, char *const *argv, char *const *env)
 {
@@ -176,6 +184,9 @@ void _exit(int status)
     args.arg0 = (int)status;
 
     sys_call(&args);
+    for (;;)
+    {
+    }
 }
 
 int wait(int *status)

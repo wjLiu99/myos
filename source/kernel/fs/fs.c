@@ -19,6 +19,7 @@ static list_t free_list;
 static fs_t *root_fs;
 extern fs_op_t devfs_op;
 extern fs_op_t fatfs_op;
+
 int path_to_num(const char *path, int *num)
 {
     int n = 0;
@@ -72,9 +73,6 @@ static void read_disk(uint32_t sector, uint32_t sector_cnt, uint8_t *buf)
         }
     }
 }
-static uint8_t TEMP_ADDR[100 * 1024];
-static uint8_t *temp_pos;
-#define TEMP_FILE_ID 100
 
 static int is_fd_bad(int file)
 {
@@ -119,16 +117,6 @@ int path_begin_with(const char *path, const char *str)
 int sys_open(const char *name, int flags, ...)
 {
 
-    if (kernel_strncmp(name, "/shell.elf", 3) == 0)
-    {
-        // read_disk(5000, 80, (uint8_t *)TEMP_ADDR);
-        // temp_pos = (uint8_t *)TEMP_ADDR;
-        int dev_id = dev_open(DEV_DISK, 0xa0, (void *)0);
-        dev_read(dev_id, 5000, (uint8_t *)TEMP_ADDR, 80);
-        temp_pos = TEMP_ADDR;
-        return TEMP_FILE_ID;
-    }
-
     file_t *file = file_alloc();
     if (!file)
     {
@@ -167,7 +155,7 @@ int sys_open(const char *name, int flags, ...)
     kernel_strncpy(file->file_name, name, FILE_NAME_SIZE);
     fs_protect(fs);
     int err = fs->op->open(fs, name, file);
-    if (file < 0)
+    if (err < 0)
     {
         fs_unprotect(fs);
         log_printf("open %s failed", name);
@@ -186,12 +174,7 @@ sys_open_failed:
 }
 int sys_read(int file, char *ptr, int len)
 {
-    if (file == TEMP_FILE_ID)
-    {
-        kernel_memcpy(ptr, temp_pos, len);
-        temp_pos += len;
-        return len;
-    }
+
     if (is_fd_bad(file) || !ptr || !len)
     {
 
@@ -328,11 +311,7 @@ int sys_write(int file, char *ptr, int len)
 }
 int sys_lseek(int file, int ptr, int dir)
 {
-    if (file == TEMP_FILE_ID)
-    {
-        temp_pos = (uint8_t *)(TEMP_ADDR + ptr);
-        return 0;
-    }
+
     if (is_fd_bad(file))
     {
 
@@ -354,10 +333,7 @@ int sys_lseek(int file, int ptr, int dir)
 }
 int sys_close(int file)
 {
-    if (file == TEMP_FILE_ID)
-    {
-        return 0;
-    }
+
     if (is_fd_bad(file))
     {
         log_printf("file err");
@@ -486,5 +462,13 @@ int sys_ioctl(int fd, int cmd, int arg0, int arg1)
     fs_protect(fs);
     int err = fs->op->ioctl(p_file, cmd, arg0, arg1);
     fs_unprotect(fs);
+    return err;
+}
+
+int sys_unlink(const char *path)
+{
+    fs_protect(root_fs);
+    int err = root_fs->op->unlink(root_fs, path);
+    fs_unprotect(root_fs);
     return err;
 }
