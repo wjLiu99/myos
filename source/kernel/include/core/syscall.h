@@ -24,6 +24,7 @@
 #define SYS_opendir 49
 #define SYS_readdir 50
 #define SYS_closedir 51
+#define SYS_ioctl 52
 
 typedef struct _syscall_frame_t
 {

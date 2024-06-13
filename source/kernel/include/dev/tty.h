@@ -4,6 +4,7 @@
 
 #define TTY_OBUF_SIZE 512
 #define TTY_IBUF_SIZE 512
+#define TTY_CMD_ECHO 0x1
 // 缓冲区
 typedef struct _tty_fifo_t
 {

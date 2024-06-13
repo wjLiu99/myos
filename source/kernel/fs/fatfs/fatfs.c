@@ -21,10 +21,12 @@ file_type_t diritem_get_type(diritem_t *diritem)
 
 static int bread_sector(fat_t *fat, int sector)
 {
-    if (sector = fat->curr_sector)
+    // if(sector = fat->curr_sector)
+    if (sector == fat->curr_sector)
     {
         return 0;
     }
+    kernel_memset(fat->fat_buffer, 0, MEM_PAGE_SIZE);
     int cnt = dev_read(fat->fs->dev_id, sector, fat->fat_buffer, 1);
     if (cnt == 1)
     {
@@ -204,17 +206,20 @@ int fatfs_open(struct _fs_t *fs, const char *path, file_t *file)
 
         if (item->DIR_Name[0] == DIRITEM_NAME_END)
         {
+            p_index = i;
             break;
         }
 
         if (item->DIR_Name[0] == DIRITEM_NAME_FREE)
         {
+            p_index = i;
             continue;
         }
 
         if (diritem_name_match(item, path))
         {
             file_item = item;
+            p_index = i;
             break;
         }
     }
@@ -226,10 +231,97 @@ int fatfs_open(struct _fs_t *fs, const char *path, file_t *file)
 
     return -1;
 }
+int cluster_is_valid(cluster_t cluster)
+{
+    return (cluster < FAT_CLUSTER_INVALID) && (cluster >= 0x2);
+}
+int cluster_get_next(fat_t *fat, cluster_t curr)
+{
+    if (!cluster_is_valid(curr))
+    {
+        return FAT_CLUSTER_INVALID;
+    }
+    int offset = curr * sizeof(cluster_t);
+    int sector = offset / fat->bytes_per_sec;
+    int off_sector = offset % fat->bytes_per_sec;
+    if (sector >= fat->tbl_sectors)
+    {
+        log_printf(" cluster too big : %d", curr);
+        return FAT_CLUSTER_INVALID;
+    }
+    int err = bread_sector(fat, fat->tbl_start + sector);
+    if (err < 0)
+    {
+        return FAT_CLUSTER_INVALID;
+    }
+
+    return *(cluster_t *)(fat->fat_buffer + off_sector);
+}
+static int move_file_pos(file_t *file, fat_t *fat, uint32_t move_bytes, int expand)
+{
+    uint32_t c_offset = file->pos % fat->cluster_byte_size;
+    if (c_offset + move_bytes >= fat->cluster_byte_size)
+    {
+        cluster_t next = cluster_get_next(fat, file->cblk);
+        if (next == FAT_CLUSTER_INVALID)
+        {
+            return -1;
+        }
+        file->cblk = next;
+    }
+    file->pos += move_bytes;
+    return 0;
+}
 
 int fatfs_read(char *buf, int size, file_t *file)
 {
-    return dev_read(file->dev_id, file->pos, buf, size);
+    fat_t *fat = (fat_t *)file->fs->data;
+    uint32_t nbytes = size;
+    if (file->pos + nbytes > file->size)
+    {
+        nbytes = file->size - file->pos;
+    }
+    uint32_t total_read = 0;
+    while (nbytes > 0)
+    {
+        uint32_t curr_read = nbytes;
+
+        uint32_t cluster_offset = file->pos % fat->cluster_byte_size;
+        uint32_t start_sector = fat->data_start + (file->cblk - 2) * fat->sec_per_cluster;
+        if ((cluster_offset == 0) && (nbytes == fat->cluster_byte_size))
+        {
+
+            int err = dev_read(fat->fs->dev_id, start_sector, buf, fat->sec_per_cluster);
+            if (err < 0)
+            {
+                return total_read;
+            }
+        }
+        else
+        {
+            if (cluster_offset + curr_read > fat->cluster_byte_size)
+            {
+                curr_read = fat->cluster_byte_size - cluster_offset;
+            }
+            int err = dev_read(fat->fs->dev_id, start_sector, fat->fat_buffer, fat->sec_per_cluster);
+            if (err < 0)
+            {
+                return total_read;
+            }
+
+            fat->curr_sector = -1;
+            kernel_memcpy(buf, fat->fat_buffer + cluster_offset, curr_read);
+        }
+        buf += curr_read;
+        nbytes -= curr_read;
+        total_read += curr_read;
+        int err = move_file_pos(file, fat, curr_read, 0);
+        if (err < 0)
+        {
+            return total_read;
+        }
+    }
+    return total_read;
 }
 
 int fatfs_write(char *buf, int size, file_t *file)
@@ -279,7 +371,7 @@ int fatfs_readdir(struct _fs_t *fs, DIR *dir, struct dirent *dirent)
                 dirent->size = item->DIR_FileSize;
                 dirent->type = type;
                 diritem_get_name(item, dirent->name);
-                dirent->index = dirent->index++;
+                dirent->index = dir->index++;
                 return 0;
             }
         }

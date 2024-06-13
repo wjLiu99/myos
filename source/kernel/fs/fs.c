@@ -466,3 +466,25 @@ int sys_closedir(DIR *dir)
     fs_unprotect(root_fs);
     return err;
 }
+
+int sys_ioctl(int fd, int cmd, int arg0, int arg1)
+{
+    if (is_fd_bad(fd))
+    {
+        log_printf("file err");
+        return 0;
+    }
+    file_t *p_file = task_file(fd);
+    if (!p_file)
+    {
+        log_printf("file not opened");
+        return -1;
+    }
+
+    fs_t *fs = p_file->fs;
+
+    fs_protect(fs);
+    int err = fs->op->ioctl(p_file, cmd, arg0, arg1);
+    fs_unprotect(fs);
+    return err;
+}
